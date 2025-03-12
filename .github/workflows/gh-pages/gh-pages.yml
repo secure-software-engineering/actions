@@ -1,11 +1,21 @@
-name: Reusable Documentation Deployment
+name: ${{ inputs.workflow_name || 'Reusable Documentation Deployment' }}
 
 on:
-  workflow_calls:
+  workflow_call:
     inputs:
+      workflow_name:
+        required: false
+        type: string
+        default: "Reusable Documentation Deployment"
+
       deploy_branch:
         required: true
         type: string
+
+      enable_comment:
+        required: false
+        type: boolean
+        default: true
 
   permissions:
     contents: write
@@ -42,7 +52,7 @@ on:
           run: mike deploy ${{ env.DOC_VERSION_NAME }}_preview -t "PR Preview ${{ env.DOC_VERSION_NAME }}" --push && mike props ${{ env.DOC_VERSION_NAME }}_preview --set-string hidden=true --push
 
         - name: Comment Link to Preview
-          if: startsWith(github.event_name, 'pull_request') && github.event.action != 'closed'
+          if: inputs.enable_comment == true && startsWith(github.event_name, 'pull_request') && github.event.action != 'closed'
           uses: marocchino/sticky-pull-request-comment@v2
           with:
             message: |
