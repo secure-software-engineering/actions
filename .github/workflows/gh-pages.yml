@@ -1,0 +1,91 @@
+name: Deploy Docs to GitHub Pages
+
+permissions:
+  contents: write
+  pages: write
+  deployments: write
+
+on:
+  workflow_call:
+    inputs:
+      deploy_branch:
+        required: true
+        type: string
+
+      enable_comment:
+        required: false
+        type: boolean
+        default: true
+
+      version:
+        required: false
+        type: string
+        default: "latest"
+
+      version_source:
+        required: false
+        type: string
+        default: "maven"
+
+jobs:
+  manage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Debug GitHub Variables
+        run: env | grep GITHUB_
+
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+
+      - name: Install Dependencies
+        run: pip install mike mkdocs-material mkdocs-tooltips git+https://github.com/RedisLabs/mkdocs-include.git git+https://github.com/swissiety/LspLexer4Pygments.git
+
+      # Sanitize head_ref name
+      - run: echo "DOC_VERSION_NAME=$(echo ${{ github.head_ref }} | sed "s/[^a-zA-Z0-9._-]/_/g" )" >> $GITHUB_ENV
+
+      # on PR events..
+      - name: Deploy Doc in Subdirectory
+        if: startsWith(github.event_name, 'pull_request')
+        run: mike deploy ${{ env.DOC_VERSION_NAME }}_preview -t "PR Preview ${{ env.DOC_VERSION_NAME }}" --push && mike props ${{ env.DOC_VERSION_NAME }}_preview --set-string hidden=true --push
+
+      - name: Comment Link to Preview
+        if: inputs.enable_comment == true && startsWith(github.event_name, 'pull_request') && github.event.action != 'closed'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          message: |
+            [Documentation Preview](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ env.DOC_VERSION_NAME }}_preview/).
+
+      # on PR close - delete preview
+      - name: Delete the Deployed Preview
+        if: startsWith(github.event_name, 'pull_request') && github.event.action == 'closed'
+        run: mike delete ${{ env.DOC_VERSION_NAME }}_preview --push
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'push' && github.base_ref == 'develop'
+        run: mike deploy develop --push --update-aliases develop latest
+
+      - name: Determine Version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION=${{ inputs.version }}
+          elif [ "${{ inputs.version_source }}" == "maven" ]; then
+            VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed "s/[^a-zA-Z0-9._-]/_/g")
+          elif [ "${{ inputs.version_source }}" == "gradle" ]; then
+            VERSION=$(gradle properties | grep "^version:" | awk '{print $2}')
+          else
+            echo "Unknown version source, using provided version: ${{ inputs.version }}"
+            VERSION=${{ inputs.version }}
+          fi
+          echo "DOC_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Deploy Doc Version for New Release
+        if: github.event_name == 'push' && github.base_ref == 'master'
+        run: mike deploy "${{ env.DOC_VERSION }}" --push
