@@ -3,8 +3,8 @@ name: Deploy Snapshot to GitHub Pages
 on:
   workflow_call:
     inputs:
-      deploy_branch:
-        required: true
+      latest_branch:
+        required: false
         type: string
       version:
         required: false
@@ -34,6 +34,11 @@ jobs:
       - name: Install Dependencies
         run: pip install mike mkdocs-material mkdocs-tooltips git+https://github.com/RedisLabs/mkdocs-include.git git+https://github.com/swissiety/LspLexer4Pygments.git
 
+      - name: Determine Deploy Branch from Environment
+        run: |
+          echo "DEPLOY_BRANCH=${github.head_ref}" >> $GITHUB_ENV
+          echo "Branch: $github.head_ref"
+
       - name: Determine Version
         run: |
           if [ "${{ inputs.version }}" == "maven" ]; then
@@ -49,17 +54,12 @@ jobs:
         run: |
           echo "Deploying documentation snapshot for branch: ${{ inputs.deploy_branch }}"
 
-          if [ "${{ inputs.deploy_branch }}" == "develop" ]; then
-            echo "Deploying to 'develop' branch with alias 'latest'..."
-            mike deploy develop --push --update-aliases develop latest
-
-          elif [[ "${{ inputs.deploy_branch }}" == release/* ]]; then
-            BRANCH_NAME=$(echo "${{ inputs.deploy_branch }}" | sed 's/release\///g')
-            echo "Deploying to release branch: $BRANCH_NAME"
-            mike deploy "$BRANCH_NAME" --push --update-aliases "$BRANCH_NAME"
+          if [ "$DEPLOY_BRANCH" == "${{ inputs.latest_branch }}" ]; then
+            echo "Deploying to "$DEPLOY_BRANCH" branch with alias 'latest'..."
+            mike deploy "$DEPLOY_BRANCH" --push --update-aliases develop latest
 
           else
-            echo "ERROR: Unsupported branch '${{ inputs.deploy_branch }}'. Exiting."
-            exit 1
+            echo "Deploying to release version: "$DEPLOY_BRANCH""
+            mike deploy "$DEPLOY_BRANCH" --push --update-aliases "$DEPLOY_BRANCH"
           fi
             echo "Deployment completed successfully!"

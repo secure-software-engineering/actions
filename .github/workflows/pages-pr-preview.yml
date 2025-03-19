@@ -8,6 +8,11 @@ on:
         type: boolean
         default: true
 
+      title_prefix:
+        required: false
+        type: string
+        default: "PR Preview: "
+
 permissions:
   contents: write
   pages: write
@@ -37,7 +42,11 @@ jobs:
       - name: Deploy Doc in Subdirectory
         if: github.event.action != 'closed'
         run: |
-          mike deploy "${{ env.DOC_VERSION_NAME }}_preview" -t "PR Preview ${{ env.DOC_VERSION_NAME }}" --push
+          PREFIX="${{ inputs.title_prefix}}"
+          TITLE="$PREFIX${{ env.DOC_VERSION_NAME }}"
+          
+          echo "Deploying documentation with title: $TITLE"
+          mike deploy "${{ env.DOC_VERSION_NAME }}_preview" -t "$TITLE" --push
           mike props "${{ env.DOC_VERSION_NAME }}_preview" --set-string hidden=true --push
 
       - name: Comment Link to Preview
