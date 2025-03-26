@@ -6,6 +6,7 @@ on:
       latest_branch:
         required: false
         type: string
+        default: "develop"
       version:
         required: false
         type: string
