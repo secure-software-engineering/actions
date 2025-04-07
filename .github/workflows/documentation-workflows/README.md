@@ -6,7 +6,7 @@ Reusable GitHub Action to deploy a documentation preview when a pull request is 
 ```yaml
 jobs:
   preview-docs:
-    uses: secure-software-engineering/actions/documentation-workflows/pages-pr-preview.yml@develop
+    uses: secure-software-engineering/actions/.github/workflows/documentation-workflows/pages-pr-preview.yml@develop
     with:
       enable_comment: true  # Optional: posts link in PR comment
       title_prefix: "PR Preview: "  # Optional: custom prefix for deployment title
@@ -17,7 +17,7 @@ Reusable GitHub Action to deploy versioned MkDocs documentation from a branch.
 ```yaml
 jobs:
   deploy-snapshot:
-    uses: secure-software-engineering/actions/documentation-workflows/pages-branch-snapshot.yml@develop
+    uses: secure-software-engineering/actions/.github/workflows/documentation-workflows/pages-branch-snapshot.yml@develop
     with:
       latest_branch: develop
       version: "maven" # Or any custom version

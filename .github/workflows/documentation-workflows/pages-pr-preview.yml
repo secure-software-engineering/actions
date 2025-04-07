@@ -22,8 +22,8 @@ jobs:
   deploy-preview:
     runs-on: ubuntu-latest
     steps:
-      - name: Debug GitHub Variables
-        run: env | grep GITHUB_
+#      - name: Debug GitHub Variables
+#        run: env | grep GITHUB_
 
       - name: Checkout Repository
         uses: actions/checkout@v3
