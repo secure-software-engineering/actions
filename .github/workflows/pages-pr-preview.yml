@@ -1,0 +1,61 @@
+name: Handle Documentation Preview  
+
+on:
+  workflow_call:
+    inputs:
+      enable_comment:
+        required: false
+        type: boolean
+        default: true
+
+      title_prefix:
+        required: false
+        type: string
+        default: "PR Preview: "
+
+permissions:
+  contents: write
+  pages: write
+  deployments: write
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    steps:
+#      - name: Debug GitHub Variables
+#        run: env | grep GITHUB_
+
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+
+      - name: Install Dependencies
+        run: pip install mike mkdocs-material mkdocs-tooltips git+https://github.com/RedisLabs/mkdocs-include.git git+https://github.com/swissiety/LspLexer4Pygments.git
+
+      - name: Set PR Version Name
+        run: echo "DOC_VERSION_NAME=$(echo ${{ github.head_ref }} | sed 's/[^a-zA-Z0-9._-]/_/g')" >> $GITHUB_ENV
+
+      - name: Deploy Doc in Subdirectory
+        if: github.event.action != 'closed'
+        run: |
+          PREFIX="${{ inputs.title_prefix}}"
+          TITLE="$PREFIX${{ env.DOC_VERSION_NAME }}"
+          
+          echo "Deploying documentation with title: $TITLE"
+          mike deploy "${{ env.DOC_VERSION_NAME }}_preview" -t "$TITLE" --push
+          mike props "${{ env.DOC_VERSION_NAME }}_preview" --set-string hidden=true --push
+
+      - name: Comment Link to Preview
+        if: inputs.enable_comment == true && github.event.action != 'closed'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          message: |
+            [Documentation Preview](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ env.DOC_VERSION_NAME }}_preview/).
+
+      - name: Delete PR Preview on Close
+        if: github.event.action == 'closed'
+        run: mike delete "${{ env.DOC_VERSION_NAME }}_preview" --push
