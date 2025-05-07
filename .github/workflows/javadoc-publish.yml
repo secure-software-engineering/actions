@@ -1,0 +1,52 @@
+name: Publish Javadoc
+
+on:
+  push:
+    branches:
+      - develop
+  release:
+    types: [ published ]
+
+jobs:
+  publish-javadoc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Generate Javadoc
+        run: mvn javadoc:javadoc
+
+      - name: Determine documentation version
+        id: version
+        run: |
+          if [[ ${{ github.event_name }} == 'release' ]]; then
+            echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=develop" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish Javadoc
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: target/site/apidocs
+          destination_dir: apidocs/${{ steps.version.outputs.version }}
+
+      - name: Update latest to point to develop
+        if: github.ref_name == 'develop'
+        run: |
+          git clone --branch=gh-pages https://github.com/${{ github.repository }}.git gh-pages
+          cd gh-pages
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          rm -rf apidocs/latest
+          cp -r apidocs/develop apidocs/latest
+          git add apidocs/latest
+          git commit -m "Update latest docs from develop"
+          git push
