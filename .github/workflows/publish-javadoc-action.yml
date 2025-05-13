@@ -1,0 +1,14 @@
+name: Trigger Javadoc Publishing
+
+on:
+  push:
+    branches:
+      - develop
+  release:
+    types: [published]
+
+jobs:
+  call-javadoc-workflow:
+    uses: ./.github/workflows/javadoc-publish.yml
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}

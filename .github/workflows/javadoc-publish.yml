@@ -1,23 +1,41 @@
 name: Publish Javadoc
 
 on:
-  push:
-    branches:
-      - develop
-  release:
-    types: [ published ]
+  workflow_call:
+    inputs:
+      java_version:
+        description: 'Java version to use'
+        required: false
+        type: string
+        default: '17'
+      java_distribution:
+        description: 'Java distribution to use'
+        required: false
+        type: string
+        default: 'temurin'
+      develop_branch:
+        description: 'Branch to use for latest documentation'
+        required: false
+        type: string
+        default: 'develop'
+    secrets:
+      token:
+        description: 'GitHub token for authentication'
+        required: true
 
 jobs:
   publish-javadoc:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: ${{ inputs.java_version }}
+          distribution: ${{ inputs.java_distribution }}
 
       - name: Generate Javadoc
         run: mvn javadoc:javadoc
@@ -26,27 +44,30 @@ jobs:
         id: version
         run: |
           if [[ ${{ github.event_name }} == 'release' ]]; then
-            echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           else
-            echo "version=develop" >> $GITHUB_OUTPUT
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Publish Javadoc
         uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.token }}
           publish_dir: target/site/apidocs
           destination_dir: apidocs/${{ steps.version.outputs.version }}
 
       - name: Update latest to point to develop
-        if: github.ref_name == 'develop'
+        if: github.ref_name == inputs.develop_branch
         run: |
-          git clone --branch=gh-pages https://github.com/${{ github.repository }}.git gh-pages
+          git clone --branch=gh-pages https://x-access-token:${{ secrets.token }}@github.com/${{ github.repository }}.git gh-pages
           cd gh-pages
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
+          
+          # Update latest directory
           rm -rf apidocs/latest
-          cp -r apidocs/develop apidocs/latest
+          cp -r apidocs/${{ github.ref_name }} apidocs/latest
+          
           git add apidocs/latest
-          git commit -m "Update latest docs from develop"
-          git push
+          git commit -m "Update latest docs from develop" || echo "No changes to commit"
+          git push origin gh-pages
