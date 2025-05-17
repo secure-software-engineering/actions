@@ -18,6 +18,11 @@ on:
         required: false
         type: string
         default: 'develop'
+      version:
+        description: 'Version to use for documentation (if not provided, will be determined from the event)'
+        required: false
+        type: string
+        default: ''
     secrets:
       token:
         description: 'GitHub token for authentication'
@@ -43,8 +48,8 @@ jobs:
       - name: Determine documentation version
         id: version
         run: |
-          if [[ ${{ github.event_name }} == 'release' ]]; then
-            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          if [[ -n "${{ inputs.version }}" ]]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
           else
             echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
@@ -56,7 +61,7 @@ jobs:
           publish_dir: target/site/apidocs
           destination_dir: apidocs/${{ steps.version.outputs.version }}
 
-      - name: Update latest to point to develop
+      - name: Update latest symlink
         if: github.ref_name == inputs.develop_branch
         run: |
           git clone --branch=gh-pages https://x-access-token:${{ secrets.token }}@github.com/${{ github.repository }}.git gh-pages
@@ -66,8 +71,10 @@ jobs:
           
           # Update latest directory
           rm -rf apidocs/latest
-          cp -r apidocs/${{ github.ref_name }} apidocs/latest
+          cd apidocs
+          ln -s ./${{ github.ref_name }} latest
+          cd ..
           
           git add apidocs/latest
-          git commit -m "Update latest docs from develop" || echo "No changes to commit"
+          git commit -m "Update latest symlink to point to ${{ github.ref_name }}" || echo "No changes to commit"
           git push origin gh-pages
