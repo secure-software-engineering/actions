@@ -1,4 +1,5 @@
 name: Auto Approve Dependabot PRs
+description: 'Automatically approves pull requests created by Dependabot'
 inputs:
   token:
     description: 'GitHub token with approval permissions'

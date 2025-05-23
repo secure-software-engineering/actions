@@ -1,0 +1,63 @@
+name: Publish Javadoc
+description: 'Generates and publishes Javadoc to GitHub Pages'
+
+inputs:
+  java_version:
+    description: 'Java version to use'
+    required: false
+    default: '17'
+  java_distribution:
+    description: 'Java distribution to use'
+    required: false
+    default: 'temurin'
+  latest_branch:
+    description: 'Branch to use for latest documentation'
+    required: false
+    default: 'develop'
+  title:
+    description: 'Title to use for documentation'
+    required: true
+  token:
+    description: 'GitHub token for authentication'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        java-version: ${{ inputs.java_version }}
+        distribution: ${{ inputs.java_distribution }}
+
+    - name: Generate Javadoc
+      shell: bash
+      run: mvn javadoc:javadoc
+
+    - name: Publish Javadoc
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ inputs.token }}
+        publish_dir: target/site/apidocs
+        destination_dir: apidocs/${{ inputs.title }}
+
+    - name: Update latest symlink
+      if: github.ref_name == inputs.latest_branch
+      shell: bash
+      run: |
+        git clone --branch=gh-pages https://x-access-token:${{ inputs.token }}@github.com/${{ github.repository }}.git gh-pages
+        cd gh-pages
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        
+        # Update latest directory
+        rm -rf apidocs/latest
+        cd apidocs
+        ln -s ./${{ inputs.title }} latest
+        cd ..
+        
+        git add apidocs/latest
+        git commit -m "Update latest symlink to point to ${{ inputs.title }}" || echo "No changes to commit"
+        git push origin gh-pages

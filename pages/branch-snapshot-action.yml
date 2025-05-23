@@ -1,0 +1,69 @@
+name: Deploy Snapshot to GitHub Pages
+description: 'Deploys documentation snapshot to GitHub Pages using mike'
+
+inputs:
+  latest_branch:
+    description: 'Branch to use for latest documentation'
+    required: false
+    default: "develop"
+  version:
+    description: 'Version source (maven, gradle, or custom string)'
+    required: false
+    default: "maven"
+  token:
+    description: 'GitHub token for authentication'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Debug GitHub Variables
+      shell: bash
+      run: env | grep GITHUB_
+
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+      with:
+        token: ${{ inputs.token }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+
+    - name: Install Dependencies
+      shell: bash
+      run: pip install mike mkdocs-material mkdocs-tooltips git+https://github.com/RedisLabs/mkdocs-include.git git+https://github.com/swissiety/LspLexer4Pygments.git
+
+    - name: Determine Deploy Branch from Environment
+      shell: bash
+      run: |
+        echo "DEPLOY_BRANCH=${github.head_ref}" >> $GITHUB_ENV
+        echo "Branch: $github.head_ref"
+
+    - name: Determine Version
+      shell: bash
+      run: |
+        if [ "${{ inputs.version }}" == "maven" ]; then
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed "s/[^a-zA-Z0-9._-]/_/g")
+        elif [ "${{ inputs.version }}" == "gradle" ]; then
+          VERSION=$(gradle properties | grep "^version:" | awk '{print $2}')
+        else
+          VERSION=${{ inputs.version }}  # Use manually provided version
+        fi
+        echo "DOC_VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Deploy Snapshot
+      shell: bash
+      run: |
+        echo "Deploying documentation snapshot for branch: ${DEPLOY_BRANCH}"
+
+        if [ "$DEPLOY_BRANCH" == "${{ inputs.latest_branch }}" ]; then
+          echo "Deploying to "$DEPLOY_BRANCH" branch with alias 'latest'..."
+          mike deploy "$DEPLOY_BRANCH" --push --update-aliases develop latest
+
+        else
+          echo "Deploying to release version: "$DEPLOY_BRANCH""
+          mike deploy "$DEPLOY_BRANCH" --push --update-aliases "$DEPLOY_BRANCH"
+        fi
+          echo "Deployment completed successfully!"
