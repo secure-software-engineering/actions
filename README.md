@@ -68,3 +68,34 @@ jobs:
           title: ''  # Required: title for documentation
 
 ```
+
+## 5. `version/version.yml` - Version Handling
+
+Handles version updates and releases for merged pull requests (Maven-based projects).
+
+### Usage
+```yaml
+name: Version Handling
+
+concurrency:
+  group: version-handling
+  cancel-in-progress: false
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+
+jobs:
+  handle-version:
+    if: ${{ github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: secure-software-engineering/actions/version/version.yml@develop
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          java_version: '17'  # Optional, default: '17'
+          java_distribution: 'adopt'  # Optional, default: 'adopt'
+          target_branch: 'master'  # Optional, default: 'master'
+          version: ''  # Optional: specify version, otherwise uses timestamp
+```

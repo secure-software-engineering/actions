@@ -1,5 +1,5 @@
 name: Version Handling
-description: 'Handles version updates and releases for merged pull requests'
+description: 'Handles version updates and releases for merged pull requests (Maven-based projects)'
 
 inputs:
   token:
@@ -18,7 +18,7 @@ inputs:
     required: false
     default: 'master'
   version:
-    description: 'Version to use (if not provided, will use semantic versioning)'
+    description: 'Version to use (if not provided, will use timestamp based versioning)'
     required: false
     default: ''
 
@@ -50,6 +50,7 @@ runs:
         fi
 
     - name: Check if branch and PR exist
+      if: github.event.pull_request.user.login != 'github-actions[bot]'
       shell: bash
       run: |
         echo VERSION_BRANCH_EXISTS=$(git ls-remote --heads origin refs/heads/version_${{ steps.versioning.outputs.version }} | wc -l) >> $GITHUB_ENV
@@ -79,14 +80,15 @@ runs:
       if: env.PR_EXISTS == '0' && github.event.pull_request.user.login != 'github-actions[bot]'
       shell: bash
       run: |
-        gh pr create --draft -B ${{ inputs.target_branch }} -H version_${{ steps.versioning.outputs.version }} -t "Update ${{ inputs.project_name }} version to ${{ steps.versioning.outputs.version }}" -b "This PR was created by the version-update workflow."
+        gh pr create --draft -B ${{ inputs.target_branch }} -H version_${{ steps.versioning.outputs.version }} -t "Update version to ${{ steps.versioning.outputs.version }}" -b "This PR was created by the version-update workflow."
       env:
         GH_TOKEN: ${{ inputs.token }}
 
     - name: Create tag for new version
-      if: github.event.pull_request.user.login == 'github-actions[bot]'
+      if: github.event.pull_request.user.login == 'github-actions[bot]' && github.event.pull_request.merged == true
       shell: bash
       run: |
+        # Extract the actual version from pom.xml after the version PR was merged to main/master
         VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
         git config --global user.email "${{ github.actor }}@users.noreply.github.com"
         git config --global user.name "${{ github.actor }}"
