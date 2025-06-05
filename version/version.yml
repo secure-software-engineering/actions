@@ -1,0 +1,96 @@
+name: Version Handling
+description: 'Handles version updates and releases for merged pull requests (Maven-based projects)'
+
+inputs:
+  token:
+    description: 'GitHub token for authentication'
+    required: true
+  java_version:
+    description: 'Java version to use'
+    required: false
+    default: '17'
+  java_distribution:
+    description: 'Java distribution to use'
+    required: false
+    default: 'adopt'
+  target_branch:
+    description: 'Target branch for version updates'
+    required: false
+    default: 'master'
+  version:
+    description: 'Version to use (if not provided, will use timestamp based versioning)'
+    required: false
+    default: ''
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout source code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ inputs.token }}
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: ${{ inputs.java_distribution }}
+        java-package: jdk
+        java-version: ${{ inputs.java_version }}
+
+    - name: Determine version
+      id: versioning
+      shell: bash
+      run: |
+        if [[ -n "${{ inputs.version }}" ]]; then
+          echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          # For now, use a simple timestamp-based version or manual input
+          echo "version=1.0.0-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Check if branch and PR exist
+      if: github.event.pull_request.user.login != 'github-actions[bot]'
+      shell: bash
+      run: |
+        echo VERSION_BRANCH_EXISTS=$(git ls-remote --heads origin refs/heads/version_${{ steps.versioning.outputs.version }} | wc -l) >> $GITHUB_ENV
+        echo PR_EXISTS=$(gh pr list \
+          --repo "$GITHUB_REPOSITORY" \
+          --json baseRefName,headRefName \
+          --jq '
+            map(select(.baseRefName == "${{ inputs.target_branch }}" and .headRefName == "version_${{ steps.versioning.outputs.version }}"))
+            | length
+          ') >> $GITHUB_ENV
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+
+    - name: Create branch and update version
+      if: env.VERSION_BRANCH_EXISTS == '0' && github.event.pull_request.user.login != 'github-actions[bot]'
+      shell: bash
+      run: |
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        git checkout -b version_${{ steps.versioning.outputs.version }}
+        mvn build-helper:parse-version versions:set -DnewVersion=\${{ steps.versioning.outputs.version }} versions:commit
+        git ls-files | grep 'pom.xml$' | xargs git add
+        git commit --allow-empty -am "Update version to ${{ steps.versioning.outputs.version }}"
+        git push origin version_${{ steps.versioning.outputs.version }}
+
+    - name: Open pull request for version update
+      if: env.PR_EXISTS == '0' && github.event.pull_request.user.login != 'github-actions[bot]'
+      shell: bash
+      run: |
+        gh pr create --draft -B ${{ inputs.target_branch }} -H version_${{ steps.versioning.outputs.version }} -t "Update version to ${{ steps.versioning.outputs.version }}" -b "This PR was created by the version-update workflow."
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+
+    - name: Create tag for new version
+      if: github.event.pull_request.user.login == 'github-actions[bot]' && github.event.pull_request.merged == true
+      shell: bash
+      run: |
+        # Extract the actual version from pom.xml after the version PR was merged to main/master
+        VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+        git config --global user.name "${{ github.actor }}"
+        git tag -a "$VERSION" -m "Version $VERSION"
+        git push origin "$VERSION"
