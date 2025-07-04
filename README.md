@@ -1,8 +1,11 @@
 # actions
 Secure Software Engineering groups GitHub Actions - centralized &amp; reusable
 
-## 1. `pages/pr-preview-action.yml` – Documentation PR Preview
+## GH-Pages Documentation with PR Preview
+workflow: `pages/pr-preview-action.yml`
+
 Reusable GitHub Action to deploy a documentation preview when a pull request is opened.
+
 ### Usage
 ```yaml
 jobs:
@@ -19,8 +22,13 @@ jobs:
           enable_comment: true  # Optional: posts link in PR comment
           title_prefix: "PR Preview: "  # Optional: custom prefix for deployment title
 ```
-## 2. `pages/branch-snapshot-action.yml` — Deploy a Snapshot for Branch
+
+
+## Deploy a Snapshot for Branch
+workflow: `pages/branch-snapshot-action.yml`
+
 Reusable GitHub Action to deploy versioned MkDocs documentation from a branch.
+
 ### Usage
 ```yaml
 jobs:
@@ -33,7 +41,8 @@ jobs:
           latest_branch: develop
           version: "maven" # Or any custom version
 ```
-## 3. `dependabot/auto-approve-action.yml` - Auto Approve Dependabot PRs
+## Auto Approve Dependabot PRs
+workflow: `dependabot/auto-approve-action.yml`
 
 This reusable GitHub Action approves PRs created by Dependabot.
 
@@ -49,7 +58,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-## 4. `javadoc/publish-action.yml` - Publish Javadoc to GitHub Pages
+## Publish Javadoc to GitHub Pages
+workflow: `javadoc/publish-action.yml`
+
 
 Reusable GitHub Action to generate and publish Javadoc to GitHub Pages.
 
@@ -69,7 +80,8 @@ jobs:
 
 ```
 
-## 5. `version/version.yml` - Version Handling
+## Version Handling
+workflow: `version/version.yml`
 
 Handles version updates and releases for merged pull requests (Maven-based projects).
 
