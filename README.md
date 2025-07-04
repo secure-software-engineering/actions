@@ -1,12 +1,47 @@
 # actions
-Secure Software Engineering groups GitHub Actions - centralized &amp; reusable
+Secure Software Engineering groups GitHub Actions - centralized &amp; reusabl to simplifying maintenance and maximize usability.
 
-## GH-Pages Documentation with PR Preview
-workflow: `pages/pr-preview-action.yml`
 
-Reusable GitHub Action to deploy a documentation preview when a pull request is opened.
+## How to configure a Repository
+TODO
+
+- use environment secrets e.g. for passwords, deployment tokens etc
+- protect develop, master: use PRs, merge queues, setup mandatory checks, disallow admins to circumvent these protections 
+- gh-pages for ducomentation
+- dependabot to get latest dependency updates
+- ...
+
+## Auto Approve Dependabot PRs
+This reusable GitHub Action approves PRs created by Dependabot.
+
+### Goal 
+Up to date dependencies with the latest security fixes. Reduce repetetive clicks from the maintainer.
 
 ### Usage
+1. [configure dependabot](https://docs.github.com/en/code-security/getting-started/dependabot-quickstart-guide) to run at least once a week.
+   ```
+   TODO quick dependabot example
+   ```
+3. define the workflow e.g. with the example below
+4. if your target branch is protected you need to define an Security Access Token - as you don't want your personal Token used in a shared project - add our bot account [tbc!] to your privileged users and request an access token from that account from the person that is currently responsible for the acocunt. Define the secret as an environment secret!
+
+### Example Configuration
+```yaml
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: secure-software-engineering/actions/dependabot/auto-approve-action.yml@develop
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+
+## GH-Pages Documentation with PR Preview
+### Usage
+ deploy a documentation preview when a pull request is opened.
+
+### Example Configuration
 ```yaml
 jobs:
   preview-docs:
@@ -24,12 +59,13 @@ jobs:
 ```
 
 
-## Deploy a Snapshot for Branch
-workflow: `pages/branch-snapshot-action.yml`
-
+## Deploy Documentation for the develop Branch
 Reusable GitHub Action to deploy versioned MkDocs documentation from a branch.
 
 ### Usage
+TODO
+
+### Example Configuration
 ```yaml
 jobs:
   deploy-snapshot:
@@ -38,33 +74,17 @@ jobs:
       - uses: secure-software-engineering/actions/pages/branch-snapshot-action.yml@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          latest_branch: develop
-          version: "maven" # Or any custom version
-```
-## Auto Approve Dependabot PRs
-workflow: `dependabot/auto-approve-action.yml`
-
-This reusable GitHub Action approves PRs created by Dependabot.
-
-### Usage
-
-```yaml
-jobs:
-  auto-approve:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: secure-software-engineering/actions/dependabot/auto-approve-action.yml@develop
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          latest_branch: develop # 
+          version: "maven" # maven to get it from the pom - if a numeric version is given it will take the parameter
 ```
 
 ## Publish Javadoc to GitHub Pages
-workflow: `javadoc/publish-action.yml`
-
-
 Reusable GitHub Action to generate and publish Javadoc to GitHub Pages.
 
 ### Usage
+TODO
+
+### Example Configuration
 ```yaml
 jobs:
   publish-javadoc:
@@ -81,11 +101,12 @@ jobs:
 ```
 
 ## Version Handling
-workflow: `version/version.yml`
-
 Handles version updates and releases for merged pull requests (Maven-based projects).
 
 ### Usage
+TODO
+
+### Example Configuration
 ```yaml
 name: Version Handling
 
