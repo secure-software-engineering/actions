@@ -59,14 +59,17 @@ jobs:
 ```
 
 
-## Deploy Documentation for the develop Branch
+## Deploy Documentation Snapshots for the develop and release Branch
 Reusable GitHub Action to deploy versioned MkDocs documentation from a branch.
 
 ### Usage
-TODO
+TODO: describe behaviour for "latest_branch" and every other branch that it is called on.
+
 
 ### Example Configuration
 ```yaml
+TODO: full example with different branches e.g. [master,develop] as trigger
+
 jobs:
   deploy-snapshot:
     runs-on: ubuntu-latest
@@ -82,7 +85,7 @@ jobs:
 Reusable GitHub Action to generate and publish Javadoc to GitHub Pages.
 
 ### Usage
-TODO
+TODO: latest branch vs. snapshotting for releases
 
 ### Example Configuration
 ```yaml
@@ -104,7 +107,7 @@ jobs:
 Handles version updates and releases for merged pull requests (Maven-based projects).
 
 ### Usage
-TODO
+TODO: how to trigger, what to do to finalize it, cleanup, 
 
 ### Example Configuration
 ```yaml
