@@ -1,0 +1,107 @@
+name: 'Zombie Auto-merge'
+description: 'Automatically merge aged zombie release PRs after specified timeout period'
+
+inputs:
+  github-token:
+    description: 'GitHub token for authentication'
+    required: false
+    default: ${{ github.token }}
+  age-days:
+    description: 'Number of days old a PR must be to auto-merge'
+    required: false
+    default: '3'
+  merge-method:
+    description: 'Merge method to use (merge, squash, rebase)'
+    required: false
+    default: 'squash'
+  delete-branch:
+    description: 'Whether to delete the branch after merging'
+    required: false
+    default: 'true'
+  zombie-label:
+    description: 'Label to identify zombie mode PRs'
+    required: false
+    default: 'zombie-mode'
+
+outputs:
+  merged-count:
+    description: 'Number of PRs that were auto-merged'
+    value: ${{ steps.auto-merge.outputs.merged-count }}
+  merged-prs:
+    description: 'List of PR numbers that were merged'
+    value: ${{ steps.auto-merge.outputs.merged-prs }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Auto-merge aged zombie release PRs
+      id: auto-merge
+      shell: bash
+      run: |
+        echo "Checking for zombie release PRs older than ${{ inputs.age-days }} days..."
+        
+        # Get current timestamp (specified days ago)
+        CUTOFF_DATE=$(date -d '${{ inputs.age-days }} days ago' --iso-8601=seconds)
+        echo "Cutoff date: $CUTOFF_DATE"
+        
+        # Find zombie release PRs older than specified days
+        gh pr list \
+          --label "${{ inputs.zombie-label }}" \
+          --state "open" \
+          --json number,createdAt,title \
+          --jq --arg cutoff "$CUTOFF_DATE" \
+          '.[] | select(.createdAt < $cutoff) | .number' > aged_prs.txt
+        
+        # Check if we found any aged PRs
+        if [ ! -s aged_prs.txt ]; then
+          echo "No aged zombie release PRs found"
+          echo "merged-count=0" >> $GITHUB_OUTPUT
+          echo "merged-prs=" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        echo "Found aged zombie release PRs:"
+        cat aged_prs.txt
+        
+        # Initialize counters
+        MERGED_COUNT=0
+        MERGED_PRS=""
+        
+        # Auto-merge each aged PR
+        while read pr_number; do
+          if [ -n "$pr_number" ]; then
+            echo "Auto-merging aged zombie release PR #$pr_number"
+        
+            # Add a comment before merging
+            gh pr comment $pr_number --body "Auto-merging after ${{ inputs.age-days }}-day timeout period."
+        
+            # Merge the PR
+            MERGE_CMD="gh pr merge $pr_number --${{ inputs.merge-method }}"
+            if [[ "${{ inputs.delete-branch }}" == "true" ]]; then
+              MERGE_CMD="$MERGE_CMD --delete-branch"
+            fi
+        
+            if eval $MERGE_CMD; then
+              echo "Successfully auto-merged PR #$pr_number"
+              MERGED_COUNT=$((MERGED_COUNT + 1))
+              if [ -z "$MERGED_PRS" ]; then
+                MERGED_PRS="$pr_number"
+              else
+                MERGED_PRS="$MERGED_PRS,$pr_number"
+              fi
+            else
+              echo "Failed to auto-merge PR #$pr_number"
+            fi
+          fi
+        done < aged_prs.txt
+        
+        # Set outputs
+        echo "merged-count=$MERGED_COUNT" >> $GITHUB_OUTPUT
+        echo "merged-prs=$MERGED_PRS" >> $GITHUB_OUTPUT
+        
+        echo "Auto-merge process completed. Merged $MERGED_COUNT PRs: $MERGED_PRS"
+        
+        # Cleanup
+        rm -f aged_prs.txt
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}

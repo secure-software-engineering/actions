@@ -1,0 +1,54 @@
+name: 'Zombie Merge Dependabot'
+description: 'Automatically enable auto-merge for Dependabot pull requests in zombie mode'
+
+inputs:
+  github-token:
+    description: 'GitHub token for authentication'
+    required: false
+    default: ${{ github.token }}
+  merge-method:
+    description: 'Merge method to use (merge, squash, rebase)'
+    required: false
+    default: 'squash'
+
+outputs:
+  auto-merge-enabled:
+    description: 'Whether auto-merge was enabled'
+    value: ${{ steps.merge.outputs.auto-merge-enabled }}
+  pr-number:
+    description: 'The PR number that had auto-merge enabled'
+    value: ${{ steps.merge.outputs.pr-number }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check if Dependabot PR
+      id: check
+      shell: bash
+      run: |
+        if [[ "${{ github.actor }}" == "dependabot[bot]" ]]; then
+          echo "is-dependabot=true" >> $GITHUB_OUTPUT
+          echo "pr-number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+        else
+          echo "is-dependabot=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Enable Auto-merge for Dependabot PR
+      id: merge
+      if: steps.check.outputs.is-dependabot == 'true'
+      shell: bash
+      run: |
+        echo "Enabling auto-merge for Dependabot PR #${{ steps.check.outputs.pr-number }}"
+        gh pr merge --auto --${{ inputs.merge-method }} "$PR_URL"
+        echo "auto-merge-enabled=true" >> $GITHUB_OUTPUT
+        echo "pr-number=${{ steps.check.outputs.pr-number }}" >> $GITHUB_OUTPUT
+      env:
+        PR_URL: ${{ github.event.pull_request.html_url }}
+        GH_TOKEN: ${{ inputs.github-token }}
+
+    - name: No Action Required
+      if: steps.check.outputs.is-dependabot == 'false'
+      shell: bash
+      run: |
+        echo "Not a Dependabot PR, no auto-merge needed"
+        echo "auto-merge-enabled=false" >> $GITHUB_OUTPUT

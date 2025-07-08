@@ -1,0 +1,50 @@
+name: 'Zombie Approve Dependabot'
+description: 'Automatically approve Dependabot pull requests in zombie mode'
+
+inputs:
+  github-token:
+    description: 'GitHub token for authentication'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  approved:
+    description: 'Whether the PR was approved'
+    value: ${{ steps.approve.outputs.approved }}
+  pr-number:
+    description: 'The PR number that was approved'
+    value: ${{ steps.approve.outputs.pr-number }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check if Dependabot PR
+      id: check
+      shell: bash
+      run: |
+        if [[ "${{ github.actor }}" == "dependabot[bot]" ]]; then
+          echo "is-dependabot=true" >> $GITHUB_OUTPUT
+          echo "pr-number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+        else
+          echo "is-dependabot=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Approve Dependabot PR
+      id: approve
+      if: steps.check.outputs.is-dependabot == 'true'
+      shell: bash
+      run: |
+        echo "Approving Dependabot PR #${{ steps.check.outputs.pr-number }}"
+        gh pr review --approve "$PR_URL"
+        echo "approved=true" >> $GITHUB_OUTPUT
+        echo "pr-number=${{ steps.check.outputs.pr-number }}" >> $GITHUB_OUTPUT
+      env:
+        PR_URL: ${{ github.event.pull_request.html_url }}
+        GH_TOKEN: ${{ inputs.github-token }}
+
+    - name: No Action Required
+      if: steps.check.outputs.is-dependabot == 'false'
+      shell: bash
+      run: |
+        echo "Not a Dependabot PR, no approval needed"
+        echo "approved=false" >> $GITHUB_OUTPUT
