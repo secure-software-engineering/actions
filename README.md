@@ -1,51 +1,172 @@
-# actions
-Secure Software Engineering groups GitHub Actions - centralized &amp; reusabl to simplifying maintenance and maximize usability.
+# GitHub Actions - Secure Software Engineering
 
+Centralized & reusable GitHub Actions to simplify maintenance and maximize usability across all repositories. This collection provides standardized workflows for dependency management, documentation, and secure repository configuration.
 
-## How to configure a Repository
-TODO
+## Repository Setup Guidelines
 
-- use environment secrets e.g. for passwords, deployment tokens etc
-- protect develop, master: use PRs, merge queues, setup mandatory checks, disallow admins to circumvent these protections 
-- gh-pages for ducomentation
-- dependabot to get latest dependency updates
-- ...
+Follow this checklist to set up a secure, maintainable repository that can be easily transferred to new maintainers:
 
-## Auto Approve Dependabot PRs
-This reusable GitHub Action approves PRs created by Dependabot.
+### Essential Security & Maintenance Configuration
 
-### Goal 
-Up to date dependencies with the latest security fixes. Reduce repetetive clicks from the maintainer.
+1. **Branch Protection Rules**
+   - Protect `main`/`master` and `develop` branches
+   - Require pull requests with mandatory status checks
+   - Require reviews from code owners
+   - Enable merge queues for busy repositories
+   - Disallow administrators from bypassing protections
 
-### Usage
-1. [configure dependabot](https://docs.github.com/en/code-security/getting-started/dependabot-quickstart-guide) to run at least once a week.
-   ```
-   TODO quick dependabot example
-   ```
-3. define the workflow e.g. with the example below
-4. if your target branch is protected you need to define an Security Access Token - as you don't want your personal Token used in a shared project - add our bot account [tbc!] to your privileged users and request an access token from that account from the person that is currently responsible for the acocunt. Define the secret as an environment secret!
+2. **Dependency Management**
+   - Configure Dependabot for automatic security updates
+   - Set up weekly dependency scans
+   - Use environment secrets for tokens and deployment credentials
 
-### Example Configuration
+3. **Documentation & Pages**
+   - Enable GitHub Pages for automatic documentation deployment
+   - Set up branch-based documentation snapshots
+   - Configure Javadoc publishing for Java projects
+
+4. **Access Control**
+   - Use environment secrets (not repository secrets) for sensitive data
+   - Add bot accounts to privileged users for automated workflows
+   - Configure CODEOWNERS file for code review assignments
+
+### Quick Dependabot Configuration
+
+Add `.github/dependabot.yml` to your repository:
+
+```yaml
+version: 2
+updates:
+   - package-ecosystem: "maven"
+     directory: "/"
+     schedule:
+        interval: "weekly"
+        day: "monday"
+        time: "09:00"
+     reviewers:
+        - "your-team"
+     assignees:
+        - "your-team"
+```
+
+---
+
+##  Available Actions
+
+### Dependency Management
+
+#### Standard Dependabot Auto-Approval
+**Purpose**: Streamline dependency updates with manual oversight
+**Use Case**: Active repositories with regular maintenance
+
 ```yaml
 jobs:
   auto-approve:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - uses: secure-software-engineering/actions/dependabot/auto-approve-action.yml@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+#### Zombie Mode - Automated Dependency Management
+**Purpose**: Keep unmaintained repositories secure with zero-touch dependency updates
+**Use Case**: Legacy repositories, archived projects, low-maintenance codebases
 
-## GH-Pages Documentation with PR Preview
-### Usage
- deploy a documentation preview when a pull request is opened.
+Zombie mode creates a complete automation pipeline:
+1. **Auto-approve & merge** Dependabot PRs immediately
+2. **Weekly scans** detect accumulated dependency updates
+3. **Creates release PRs** aggregating all changes since last release
+4. **3-day review window** allows manual intervention
+5. **Auto-merge** triggers your existing release workflows
 
-### Example Configuration
+##### Setup Zombie Mode
+
+Add these two scheduling workflows to orchestrate your existing actions:
+
+```yaml
+name: Zombie Release Management
+on:
+  schedule:
+    - cron: '0 9 * * MON'  # Weekly on Monday at 9 AM
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: secure-software-engineering/actions/zombie-mode/zombie-mode.yml@develop
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          base-branch: 'main'
+          auto-merge-days: '3'
+          version-file: 'pom.xml'  # For Maven projects
+
+  auto-merge-aged:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+    steps:
+      - uses: secure-software-engineering/actions/zombie-mode/auto-merge-zombie-prs.yml@develop
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          age-days: '3'
+          merge-method: 'squash'
+          delete-branch: 'true'
+```
+
+For Dependabot automation, use your existing actions:
+```yaml
+   name: Dependabot Management
+   on:
+      pull_request:
+      types: [opened]
+
+   jobs:
+      auto-approve:
+         runs-on: ubuntu-latest
+         permissions:
+            pull-requests: write
+         steps:
+            - uses: secure-software-engineering/actions/dependabot/auto-approve-action.yml@develop
+              with:
+               token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+##### Manual Control Options
+
+- **Immediate merge**: Manually merge the zombie release PR to trigger release immediately
+- **Cancel release**: Close the zombie release PR to skip this release cycle
+- **Review changes**: Check PR description for complete list of dependency updates
+- **Emergency stop**: Remove `zombie-mode` label to exclude PR from auto-merge
+
+##### Requirements for Zombie Mode
+
+- Maven-based project with `pom.xml` (or specify custom `version-file`)
+- Dependabot configured and enabled
+- Semantic versioning format (`v1.2.3`)
+- Repository write permissions for GitHub Actions
+
+---
+
+### Documentation & Pages
+
+#### PR Documentation Preview
+**Purpose**: Deploy documentation previews for pull requests to review changes before merge
+
 ```yaml
 jobs:
   preview-docs:
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      pull-requests: write
     steps:
       - uses: secure-software-engineering/actions/pages/pr-preview-action.yml@develop
         with:
@@ -54,65 +175,76 @@ jobs:
           head_ref: ${{ github.head_ref }}
           repository_owner: ${{ github.repository_owner }}
           repository_name: ${{ github.event.repository.name }}
-          enable_comment: true  # Optional: posts link in PR comment
-          title_prefix: "PR Preview: "  # Optional: custom prefix for deployment title
+          enable_comment: true  # Posts preview link in PR comments
+          title_prefix: "PR Preview: "  # Custom deployment title prefix
 ```
 
+**How it works**: When a PR is opened, creates a temporary documentation deployment accessible via unique URL. Automatically cleans up when PR is closed.
 
-## Deploy Documentation Snapshots for the develop and release Branch
-Reusable GitHub Action to deploy versioned MkDocs documentation from a branch.
+#### Branch Documentation Snapshots
+**Purpose**: Deploy versioned documentation for different branches (develop, releases)
 
-### Usage
-TODO: describe behaviour for "latest_branch" and every other branch that it is called on.
-
-
-### Example Configuration
 ```yaml
-TODO: full example with different branches e.g. [master,develop] as trigger
+# Trigger on push to main branches
+on:
+  push:
+    branches: [main, develop, 'release/*']
 
 jobs:
   deploy-snapshot:
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      contents: read
     steps:
       - uses: secure-software-engineering/actions/pages/branch-snapshot-action.yml@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          latest_branch: develop # 
-          version: "maven" # maven to get it from the pom - if a numeric version is given it will take the parameter
+          latest_branch: develop  # Branch treated as "latest" version
+          version: "maven"  # Extract version from pom.xml, or specify manually
 ```
 
-## Publish Javadoc to GitHub Pages
-Reusable GitHub Action to generate and publish Javadoc to GitHub Pages.
+**Behavior**:
+- **Latest branch** (e.g., `develop`): Deployed as `/latest/` and root `/`
+- **Release branches**: Deployed as `/v1.2.3/` based on version
+- **Other branches**: Deployed as `/branch-name/`
 
-### Usage
-TODO: latest branch vs. snapshotting for releases
+#### Javadoc Publishing
+**Purpose**: Generate and publish Javadoc documentation to GitHub Pages
 
-### Example Configuration
 ```yaml
 jobs:
   publish-javadoc:
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      contents: read
     steps:
       - uses: secure-software-engineering/actions/javadoc/publish-action.yml@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          java_version: '17'  # Optional, default: '17'
-          java_distribution: 'temurin'  # Optional, default: 'temurin'
-          latest_branch: 'develop'  # Optional, default: 'develop'
-          title: ''  # Required: title for documentation
-
+          java_version: '17'  # Java version for building
+          java_distribution: 'temurin'  # JDK distribution
+          latest_branch: 'develop'  # Branch for latest docs
+          title: 'My Project API Documentation'  # Required: documentation title
 ```
 
-## Version Handling
-Handles version updates and releases for merged pull requests (Maven-based projects).
+**Output**:
+- **Latest branch**: Published as main Javadoc site
+- **Release tags**: Archived as versioned API documentation
+- Includes search functionality and cross-references
 
-### Usage
-TODO: how to trigger, what to do to finalize it, cleanup, 
+---
 
-### Example Configuration
+### Version & Release Management
+
+#### Automated Version Handling
+**Purpose**: Handle version updates and releases for merged pull requests (Maven projects)
+
 ```yaml
 name: Version Handling
 
+# Prevent concurrent version updates
 concurrency:
   group: version-handling
   cancel-in-progress: false
@@ -120,18 +252,111 @@ concurrency:
 on:
   pull_request:
     types: [closed]
-    branches: [master]
+    branches: [main]
 
 jobs:
   handle-version:
     if: ${{ github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: secure-software-engineering/actions/version/version.yml@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          java_version: '17'  # Optional, default: '17'
-          java_distribution: 'adopt'  # Optional, default: 'adopt'
-          target_branch: 'master'  # Optional, default: 'master'
-          version: ''  # Optional: specify version, otherwise uses timestamp
+          java_version: '17'
+          java_distribution: 'temurin'
+          target_branch: 'main'  # Target branch for releases
+          version: ''  # Leave empty to auto-generate timestamp version
 ```
+
+**Process**:
+1. **PR merged to main** → Triggers version workflow
+2. **Version calculation** → Increments based on PR labels or uses timestamp
+3. **Maven version update** → Updates `pom.xml` with new version
+4. **Git tag creation** → Creates release tag
+5. **Cleanup** → Prepares repository for next development cycle
+
+**Finalization Steps**:
+- Review generated release tag
+- Manually trigger deployment workflows if needed
+- Clean up any temporary branches
+
+---
+
+## Advanced Configuration
+
+### Environment Secrets Setup
+
+For repositories requiring additional permissions:
+
+1. **Create bot account** or request access to shared service account
+2. **Generate Personal Access Token** with required scopes:
+   - `repo` - Full repository access
+   - `write:packages` - Package publishing
+   - `pages:write` - GitHub Pages deployment
+3. **Add as environment secret** (not repository secret) named `BOT_TOKEN`
+4. **Update workflows** to use `${{ secrets.BOT_TOKEN }}` instead of `GITHUB_TOKEN`
+
+### Protected Branch Configuration
+
+```bash
+# Example branch protection API call
+curl -X PUT \
+  -H "Authorization: token $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  https://api.github.com/repos/OWNER/REPO/branches/main/protection \
+  -d '{
+    "required_status_checks": {
+      "strict": true,
+      "contexts": ["ci/build", "ci/test"]
+    },
+    "enforce_admins": true,
+    "required_pull_request_reviews": {
+      "required_approving_review_count": 1,
+      "dismiss_stale_reviews": true
+    },
+    "restrictions": null
+  }'
+```
+
+### Troubleshooting
+
+**Common Issues**:
+
+1. **Permission denied errors**: Check if `GITHUB_TOKEN` has sufficient permissions, use bot token if needed
+2. **Zombie mode not triggering**: Verify Dependabot is enabled and creating PRs
+3. **Documentation not deploying**: Ensure GitHub Pages is enabled and source is set to "GitHub Actions"
+4. **Version workflow failures**: Check Maven configuration and ensure `pom.xml` is in repository root
+
+**Debug Steps**:
+1. Check workflow run logs in Actions tab
+2. Verify repository settings and permissions
+3. Test with minimal configuration first
+4. Review branch protection rules for conflicts
+
+---
+
+##  Migration Guide
+
+### From Manual to Automated
+
+1. **Start with standard actions** for active repositories
+2. **Gradually enable zombie mode** for stable, low-maintenance projects
+3. **Test in fork first** to verify compatibility with your project structure
+4. **Monitor first few runs** to ensure expected behavior
+
+### Repository Transfer Checklist
+
+When transferring repository to new maintainer:
+
+- [ ] Document custom configuration in repository README
+- [ ] Transfer environment secrets and bot account access
+- [ ] Update CODEOWNERS file with new maintainer
+- [ ] Verify branch protection rules are properly configured
+- [ ] Test all automated workflows with new maintainer permissions
+- [ ] Provide access to this actions repository documentation
+
+---
+
+*This actions repository is maintained by the Secure Software Engineering team. For questions, issues, or feature requests, please open an issue in this repository.*
