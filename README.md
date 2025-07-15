@@ -1,6 +1,7 @@
 # GitHub Actions - Secure Software Engineering
 
-Centralized & reusable GitHub Actions to simplify maintenance and maximize usability across all repositories. This collection provides standardized workflows for dependency management, documentation, and secure repository configuration.
+Centralized & reusable GitHub Actions to simplify maintenance and maximize usability across all our repositories.
+This collection provides our guidelines with standardized workflows for dependency management, documentation, and secure repository configuration to improve project maintenance.
 
 ## Repository Setup Guidelines
 
