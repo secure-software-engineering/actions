@@ -48,7 +48,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # We create a preview with a title and name that depend on the current pull 
-          # request (e.g. on pull request #100, we have the name and title 'pr-100'
+          # request (e.g. on pull request #100, we have the name and title 'pr-100')
           preview-name: pr-${{ github.event.pull_request.number }}
           preview-title: Preview for pr-${{ github.event.pull_request.number }}
 
