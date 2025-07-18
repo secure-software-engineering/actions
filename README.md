@@ -43,10 +43,10 @@ updates:
      schedule:
         interval: "weekly"
         day: "monday"
-        time: "09:00"
-     reviewers:
+        time: "05:00"   # so that it is running before the workday starts
+     reviewers:         # optional
         - "your-team"
-     assignees:
+     assignees:         # optional
         - "your-team"
 ```
 
