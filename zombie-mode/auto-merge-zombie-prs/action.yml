@@ -2,10 +2,9 @@ name: 'Zombie Auto-merge'
 description: 'Automatically merge aged zombie release PRs after specified timeout period'
 
 inputs:
-  github-token:
+  token:
     description: 'GitHub token for authentication'
-    required: false
-    default: ${{ github.token }}
+    required: true
   age-days:
     description: 'Number of days old a PR must be to auto-merge'
     required: false
@@ -104,4 +103,4 @@ runs:
         # Cleanup
         rm -f aged_prs.txt
       env:
-        GH_TOKEN: ${{ inputs.github-token }}
+        GH_TOKEN: ${{ inputs.token }}

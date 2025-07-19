@@ -12,7 +12,7 @@ inputs:
   java_distribution:
     description: 'Java distribution to use'
     required: false
-    default: 'adopt'
+    default: 'temurin'
   target_branch:
     description: 'Target branch for version updates'
     required: false
@@ -37,6 +37,12 @@ runs:
         distribution: ${{ inputs.java_distribution }}
         java-package: jdk
         java-version: ${{ inputs.java_version }}
+
+    - name: Configure git user
+      shell: bash
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
 
     - name: Determine version
       id: versioning
@@ -68,8 +74,6 @@ runs:
       if: env.VERSION_BRANCH_EXISTS == '0' && github.event.pull_request.user.login != 'github-actions[bot]'
       shell: bash
       run: |
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git config --global user.name "github-actions[bot]"
         git checkout -b version_${{ steps.versioning.outputs.version }}
         mvn build-helper:parse-version versions:set -DnewVersion=\${{ steps.versioning.outputs.version }} versions:commit
         git ls-files | grep 'pom.xml$' | xargs git add
@@ -90,7 +94,5 @@ runs:
       run: |
         # Extract the actual version from pom.xml after the version PR was merged to main/master
         VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-        git config --global user.email "${{ github.actor }}@users.noreply.github.com"
-        git config --global user.name "${{ github.actor }}"
         git tag -a "$VERSION" -m "Version $VERSION"
         git push origin "$VERSION"

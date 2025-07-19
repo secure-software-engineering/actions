@@ -2,10 +2,9 @@ name: 'Zombie Release'
 description: 'Automatically create release PRs when dependency updates accumulate'
 
 inputs:
-  github-token:
+  token:
     description: 'GitHub token for authentication'
-    required: false
-    default: ${{ github.token }}
+    required: true
   base-branch:
     description: 'Base branch to create release PR against'
     required: false
@@ -37,6 +36,12 @@ runs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+
+    - name: Configure git user
+      shell: bash
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
 
     - name: Get latest release
       id: latest_release
@@ -103,10 +108,6 @@ runs:
       run: |
         NEW_VERSION="${{ steps.version.outputs.new_version }}"
         
-        # Configure git
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        
         # Create release branch
         git checkout -b "zombie-release-$NEW_VERSION"
         
@@ -161,7 +162,7 @@ runs:
         echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
         echo "Created release PR #$PR_NUMBER for $NEW_VERSION"
       env:
-        GH_TOKEN: ${{ inputs.github-token }}
+        GH_TOKEN: ${{ inputs.token }}
 
     - name: No Release Needed
       if: steps.check_updates.outputs.dependency_commits == 0

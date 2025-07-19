@@ -2,6 +2,9 @@ name: Deploy Snapshot to GitHub Pages
 description: 'Deploys documentation snapshot to GitHub Pages using mike'
 
 inputs:
+  token:
+    description: 'GitHub token for authentication'
+    required: true
   latest_branch:
     description: 'Branch to use for latest documentation'
     required: false
@@ -10,21 +13,14 @@ inputs:
     description: 'Version source (maven, gradle, or custom string)'
     required: false
     default: "maven"
-  token:
-    description: 'GitHub token for authentication'
-    required: true
 
 runs:
   using: "composite"
   steps:
-    - name: Debug GitHub Variables
-      shell: bash
-      run: env | grep GITHUB_
-
     - name: Checkout Repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
-        token: ${{ inputs.token }}
+        fetch-depth: 0
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -35,11 +31,17 @@ runs:
       shell: bash
       run: pip install mike mkdocs-material mkdocs-tooltips git+https://github.com/RedisLabs/mkdocs-include.git git+https://github.com/swissiety/LspLexer4Pygments.git
 
+    - name: Configure git user
+      shell: bash
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+
     - name: Determine Deploy Branch from Environment
       shell: bash
       run: |
-        echo "DEPLOY_BRANCH=${github.head_ref}" >> $GITHUB_ENV
-        echo "Branch: $github.head_ref"
+        echo "DEPLOY_BRANCH=${{ github.head_ref }}" >> $GITHUB_ENV
+        echo "Branch: ${{ github.head_ref }}"
 
     - name: Determine Version
       shell: bash
@@ -61,9 +63,8 @@ runs:
         if [ "$DEPLOY_BRANCH" == "${{ inputs.latest_branch }}" ]; then
           echo "Deploying to "$DEPLOY_BRANCH" branch with alias 'latest'..."
           mike deploy "$DEPLOY_BRANCH" --push --update-aliases develop latest
-
         else
           echo "Deploying to release version: "$DEPLOY_BRANCH""
           mike deploy "$DEPLOY_BRANCH" --push --update-aliases "$DEPLOY_BRANCH"
         fi
-          echo "Deployment completed successfully!"
+        echo "Deployment completed successfully!"
