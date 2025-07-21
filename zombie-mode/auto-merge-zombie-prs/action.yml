@@ -17,7 +17,7 @@ inputs:
     description: 'Whether to delete the branch after merging'
     required: false
     default: 'true'
-  zombie-label:
+  label:
     description: 'Label to identify zombie mode PRs'
     required: false
     default: 'zombie-mode'
@@ -44,15 +44,15 @@ runs:
         echo "Cutoff date: $CUTOFF_DATE"
         
         # Find zombie release PRs older than specified days
-        gh pr list \
-          --label "${{ inputs.zombie-label }}" \
+        AGED_PRS=$(gh pr list \
+          --label "${{ inputs.label }}" \
           --state "open" \
           --json number,createdAt,title \
           --jq --arg cutoff "$CUTOFF_DATE" \
-          '.[] | select(.createdAt < $cutoff) | .number' > aged_prs.txt
+          '.[] | select(.createdAt < $cutoff) | .number')
         
         # Check if we found any aged PRs
-        if [ ! -s aged_prs.txt ]; then
+        if [ -z "$AGED_PRS" ]; then
           echo "No aged zombie release PRs found"
           echo "merged-count=0" >> $GITHUB_OUTPUT
           echo "merged-prs=" >> $GITHUB_OUTPUT
@@ -60,14 +60,14 @@ runs:
         fi
         
         echo "Found aged zombie release PRs:"
-        cat aged_prs.txt
+        echo "$AGED_PRS"
         
         # Initialize counters
         MERGED_COUNT=0
         MERGED_PRS=""
         
         # Auto-merge each aged PR
-        while read pr_number; do
+        while IFS= read -r pr_number; do
           if [ -n "$pr_number" ]; then
             echo "Auto-merging aged zombie release PR #$pr_number"
         
@@ -92,15 +92,13 @@ runs:
               echo "Failed to auto-merge PR #$pr_number"
             fi
           fi
-        done < aged_prs.txt
+        done <<< "$AGED_PRS"
         
         # Set outputs
         echo "merged-count=$MERGED_COUNT" >> $GITHUB_OUTPUT
         echo "merged-prs=$MERGED_PRS" >> $GITHUB_OUTPUT
         
         echo "Auto-merge process completed. Merged $MERGED_COUNT PRs: $MERGED_PRS"
-        
-        # Cleanup
-        rm -f aged_prs.txt
+
       env:
         GH_TOKEN: ${{ inputs.token }}

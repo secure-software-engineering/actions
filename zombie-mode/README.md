@@ -34,7 +34,7 @@ jobs:
           age-days: '3'
           merge-method: 'squash'
           delete-branch: 'true'
-          zombie-label: 'zombie-mode'
+          label: 'zombie-mode'
 ```
 
 This action runs on a schedule (daily) or can be triggered manually. It identifies zombie release PRs that are older than the specified age limit and automatically merges them after adding a comment explaining the auto-merge action.
