@@ -61,3 +61,53 @@ Possible options:
 - **preview-title**: A title for the preview. This title does not need to relate to the current pull request or the preview name (required)
 - **gh-pages-branch**: The branch name where the GitHub pages are deployed to (optional, default: gh-pages)
 - **enable-comment**: If 'true', the action adds a comment to the pull request that links the most recent preview. The comment is recreated after each commit that triggered the action (optional, default: true)
+
+
+
+# Deploy Snapshot to GitHub Pages
+
+The **branch-snapshot** deploys documentation snapshots to GitHub Pages using mike. It automatically determines version information from Maven projects and creates branch-specific documentation deployments.
+
+A possible action **deploy_snapshot.yml** can look like this:
+```yaml
+name: Deploy Documentation Snapshot
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'release/**'
+    # Only trigger when there are changes to documentation related files
+    paths:
+      - mkdocs.yml
+      - docs/**
+      - pom.xml
+      - build.gradle
+      - '.github/workflows/deploy_snapshot.yml'
+
+jobs:
+  deploy-snapshot:
+    name: Deploy documentation snapshot
+    runs-on: ubuntu-latest
+    
+    # These permissions are needed to push and deploy the pages files
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Deploy Documentation Snapshot
+        uses: secure-software-engineering/actions/pages/branch-snapshot@develop
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+```
+
+This action triggers when there are changes to documentation files or build configurations. It deploys documentation snapshots for each branch, making it easy to preview documentation changes across different development branches.
+
+Possible options:
+- **token**: The GitHub token for authentication (required)
+- **latest_branch**: Branch that should get the "latest" alias (optional, default: 'develop')
+- **version**: Version source - "maven", "gradle", or custom string (optional, default: 'maven')
