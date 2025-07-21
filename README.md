@@ -67,7 +67,7 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: secure-software-engineering/actions/dependabot/auto-approve-action.yml@develop
+      - uses: secure-software-engineering/actions/dependabot/auto-approve-action@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -101,7 +101,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: secure-software-engineering/actions/zombie-mode/zombie-mode.yml@develop
+      - uses: secure-software-engineering/actions/zombie-mode/zombie-mode@develop
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           base-branch: 'main'
@@ -114,7 +114,7 @@ jobs:
       pull-requests: write
       contents: write
     steps:
-      - uses: secure-software-engineering/actions/zombie-mode/auto-merge-zombie-prs.yml@develop
+      - uses: secure-software-engineering/actions/zombie-mode/auto-merge-zombie-prs@develop
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           age-days: '3'
@@ -135,7 +135,7 @@ For Dependabot automation, use your existing actions:
          permissions:
             pull-requests: write
          steps:
-            - uses: secure-software-engineering/actions/dependabot/auto-approve-action.yml@develop
+            - uses: secure-software-engineering/actions/dependabot/auto-approve-action@develop
               with:
                token: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -169,7 +169,7 @@ jobs:
       pages: write
       pull-requests: write
     steps:
-      - uses: secure-software-engineering/actions/pages/pr-preview-action.yml@develop
+      - uses: secure-software-engineering/actions/pages/documentation/handle-pr-preview@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           event_action: ${{ github.event.action }}
@@ -198,7 +198,7 @@ jobs:
       pages: write
       contents: read
     steps:
-      - uses: secure-software-engineering/actions/pages/branch-snapshot-action.yml@develop
+      - uses: secure-software-engineering/actions/documentation/pin-version@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           latest_branch: develop  # Branch treated as "latest" version
@@ -221,7 +221,7 @@ jobs:
       pages: write
       contents: read
     steps:
-      - uses: secure-software-engineering/actions/javadoc/publish-action.yml@develop
+      - uses: secure-software-engineering/actions/javadoc/publish-action@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           java_version: '17'  # Java version for building
@@ -262,7 +262,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: secure-software-engineering/actions/version/version.yml@develop
+      - uses: secure-software-engineering/actions/version/version@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           java_version: '17'

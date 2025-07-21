@@ -44,7 +44,7 @@ jobs:
           fetch-depth: 0
 
       - name: Create Documentation Preview
-        uses: secure-software-engineering/actions/pages/doc-preview@develop
+        uses: secure-software-engineering/actions/documentation/handle-pr-preview@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # We create a preview with a title and name that depend on the current pull 
@@ -84,7 +84,7 @@ on:
       - docs/**
       - pom.xml
       - build.gradle
-      - '.github/workflows/deploy_snapshot.yml'
+      - '.github/workflows/documentation-version.yml'
 
 jobs:
   deploy-snapshot:
@@ -99,7 +99,7 @@ jobs:
 
     steps:
       - name: Deploy Documentation Snapshot
-        uses: secure-software-engineering/actions/pages/branch-snapshot@develop
+        uses: secure-software-engineering/actions/documentation/pin-version@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
