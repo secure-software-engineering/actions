@@ -1,4 +1,8 @@
-name: Deploy Snapshot to GitHub Pages
+# see https://squidfunk.github.io/mkdocs-material/setup/setting-up-versioning/
+# execute once, after the first deployment has 'latest' as alias:
+# mike set-default latest --push
+
+name: Deploy Documentation to Pages
 description: 'Deploys documentation snapshot to GitHub Pages using mike'
 
 inputs:
@@ -6,7 +10,7 @@ inputs:
     description: 'GitHub token for authentication'
     required: true
   latest_branch:
-    description: 'Branch to use for latest documentation'
+    description: 'Branch that is updated to show the *latest* documentation'
     required: false
     default: "develop"
   version:
@@ -55,7 +59,7 @@ runs:
         fi
         echo "DOC_VERSION=$VERSION" >> $GITHUB_ENV
 
-    - name: Deploy Snapshot
+    - name: Deploy Documentation Snapshot
       shell: bash
       run: |
         echo "Deploying documentation snapshot for branch: ${DEPLOY_BRANCH}"
