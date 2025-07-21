@@ -2,8 +2,8 @@ name: Publish Javadoc
 description: 'Generates and publishes Javadoc to GitHub Pages'
 
 inputs:
-  title:
-    description: 'Title to use for documentation'
+  path:
+    description: 'Path to use for documentation, will be sanitized to represent a filename'
     required: true
   token:
     description: 'GitHub token for authentication'
@@ -17,7 +17,7 @@ inputs:
     required: false
     default: 'temurin'
   latest_branch:
-    description: 'Branch to use for latest documentation'
+    description: 'Branch that contains the *latest* documentation enabling updates in that directory'
     required: false
     default: 'develop'
 
@@ -38,14 +38,19 @@ runs:
       shell: bash
       run: mvn javadoc:javadoc
 
+    - name: sanitize input path
+      shell: bash
+      run: |
+          echo PATH=$("${{ inputs.path }}| sed "s/[^a-zA-Z0-9._-]/_/g") >> $GITHUB_ENV
+
     - name: Publish Javadoc
       uses: peaceiris/actions-gh-pages@v4
       with:
         github_token: ${{ inputs.token }}
         publish_dir: target/site/apidocs
-        destination_dir: apidocs/${{ inputs.title }}
+        destination_dir: apidocs/${{ env.PATH }}
 
-    - name: Update latest symlink
+    - name: Update *latest* documentation
       if: github.ref_name == inputs.latest_branch
       shell: bash
       run: |
@@ -57,9 +62,9 @@ runs:
         # Update latest directory
         rm -rf apidocs/latest
         cd apidocs
-        ln -s ./${{ inputs.title }} latest
+        ln -s ./${{ env.PATH }} latest
         cd ..
         
         git add apidocs/latest
-        git commit -m "Update latest symlink to point to ${{ inputs.title }}" || echo "No changes to commit"
+        git commit -m "Update latest symlink to point to ${{ env.PATH }}" || echo "No changes to commit"
         git push origin gh-pages

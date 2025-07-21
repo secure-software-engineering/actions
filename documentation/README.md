@@ -16,14 +16,13 @@ on:
       - main
     types:
       - opened
-      - closed # Required, otherwise the preview is not deleted
+      - closed                        # Required, otherwise the preview is not deleted
       - synchronize
       - reopened
-    # Only trigger on changes in documentation related files
-    paths:
+    paths:                            # Only trigger on changes in documentation related files
       - mkdocs.yml
       - docs/**
-      - .github/workflows/doc_preview.yml
+      - .github/workflows/documentation-preview.yml     # same name as this file!
 
 concurrency:
   group: gh-pages
@@ -32,7 +31,7 @@ jobs:
   deploy-preview:
     name: Preview documentation
     runs-on: ubuntu-latest
-    # These permissions are needed to push and deploy the pages files
+    # These permissions are needed to push and deploy the pages files and comment the link to the documentation
     permissions:
       contents: write
       pull-requests: write
@@ -102,7 +101,6 @@ jobs:
         uses: secure-software-engineering/actions/documentation/pin-version@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-
 ```
 
 This action triggers when there are changes to documentation files or build configurations. It deploys documentation snapshots for each branch, making it easy to preview documentation changes across different development branches.

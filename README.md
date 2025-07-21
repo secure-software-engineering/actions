@@ -227,7 +227,7 @@ jobs:
           java_version: '17'  # Java version for building
           java_distribution: 'temurin'  # JDK distribution
           latest_branch: 'develop'  # Branch for latest docs
-          title: 'My Project API Documentation'  # Required: documentation title
+          path: ${{ github.ref_name }}
 ```
 
 **Output**:

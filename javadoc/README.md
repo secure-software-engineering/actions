@@ -36,7 +36,7 @@ jobs:
         uses: secure-software-engineering/actions/javadoc@develop
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          title: ${{ github.ref_name }}
+          path: ${{ github.ref_name }}
 ```
 
 This action triggers when there are changes to Java source files or the Maven configuration. It generates Javadoc documentation and publishes it to `https://<username>.github.io/<repository>/apidocs/<title>/`. When pushing to the latest branch (default: `develop`), it also updates the "latest" symlink to point to the new documentation.
@@ -47,3 +47,7 @@ This action triggers when there are changes to Java source files or the Maven co
 - **java_version**: Java version to use for building (optional, default: '17')
 - **java_distribution**: Java distribution to use (optional, default: 'temurin')
 - **latest_branch**: Branch that should update the "latest" symlink (optional, default: 'develop')
+
+## Assumptions
+- There exists one branch (here: develop) that points to a *latest* javadoc.
+- In all other branches (here: master) we will create a new version of javadoc.
