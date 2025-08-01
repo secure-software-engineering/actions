@@ -1,0 +1,19 @@
+name: Auto Approve Dependabot PRs
+
+on:
+  workflow_call:
+    inputs:
+      token:
+        description: 'GitHub token with approval permissions'
+        required: true
+        type: string
+
+jobs:
+  approve-dependabot-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approve PR
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ inputs.token }}

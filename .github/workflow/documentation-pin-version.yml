@@ -1,0 +1,74 @@
+# see https://squidfunk.github.io/mkdocs-material/setup/setting-up-versioning/
+# execute once, after the first deployment has 'latest' as alias:
+# mike set-default latest --push
+
+name: Deploy Documentation to Pages
+
+on:
+  workflow_call:
+    inputs:
+      token:
+        description: 'GitHub token for authentication'
+        required: true
+        type: string
+      latest_branch:
+        description: 'Branch that is updated to show the *latest* documentation'
+        required: false
+        default: "develop"
+        type: string
+      version:
+        description: 'Version source (maven, gradle, or custom string)'
+        required: false
+        default: "maven"
+        type: string
+
+jobs:
+  deploy-documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+
+      - name: Install Dependencies
+        run: pip install mike mkdocs-material mkdocs-tooltips git+https://github.com/RedisLabs/mkdocs-include.git git+https://github.com/swissiety/LspLexer4Pygments.git
+
+      - name: Configure git user
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Determine Deploy Branch from Environment
+        run: |
+          echo "DEPLOY_BRANCH=${{ github.head_ref }}" >> $GITHUB_ENV
+          echo "Branch: ${{ github.head_ref }}"
+
+      - name: Determine Version
+        run: |
+          if [ "${{ inputs.version }}" == "maven" ]; then
+            VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed "s/[^a-zA-Z0-9._-]/_/g")
+          elif [ "${{ inputs.version }}" == "gradle" ]; then
+            VERSION=$(gradle properties | grep "^version:" | awk '{print $2}')
+          else
+            VERSION=${{ inputs.version }}  # Use manually provided version
+          fi
+          echo "DOC_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Deploy Documentation Snapshot
+        run: |
+          echo "Deploying documentation snapshot for branch: ${DEPLOY_BRANCH}"
+
+          if [ "$DEPLOY_BRANCH" == "${{ inputs.latest_branch }}" ]; then
+            echo "Deploying to "$DEPLOY_BRANCH" branch with alias 'latest'..."
+            mike deploy "$DEPLOY_BRANCH" --push --update-aliases develop latest
+          else
+            echo "Deploying to release version: "$DEPLOY_BRANCH""
+            mike deploy "$DEPLOY_BRANCH" --push --update-aliases "$DEPLOY_BRANCH"
+          fi
+          echo "Deployment completed successfully!"
