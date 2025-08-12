@@ -2,6 +2,9 @@ name: Documentation Preview
 description: Create and deploy a preview of the documentation
 
 inputs:
+  token:
+    description: 'GitHub token for authentication'
+    required: true
   preview-name:
     description: 'The name of the preview'
     required: true
