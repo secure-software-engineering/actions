@@ -1,0 +1,132 @@
+name: Deploy to Maven Central
+description: 'Deploys Maven artifacts to Maven Central and creates a pull request for the next SNAPSHOT version'
+
+inputs:
+  maven_username:
+    description: 'Maven Central username'
+    required: true
+  maven_token:
+    description: 'Maven Central token'
+    required: true
+  gpg_private_key:
+    description: 'GPG private key for signing'
+    required: true
+  gpg_passphrase:
+    description: 'GPG private key passphrase'
+    required: true
+  token:
+    description: 'GitHub token for creating PRs'
+    required: true
+  java_version:
+    description: 'Java version to use'
+    default: '17'
+  java_distribution:
+    description: 'Java distribution to use'
+    default: 'temurin'
+  target_branch:
+    description: 'Target branch for SNAPSHOT PR'
+    default: 'develop'
+  release_branch:
+    description: 'Branch to release from'
+    default: 'master'
+  skip_tests:
+    description: 'Skip tests during deployment'
+    default: 'true'
+  snapshot_branch_name:
+    description: 'Base name for SNAPSHOT branch'
+    default: 'snapshot_version'
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ inputs.java_version }}
+        distribution: ${{ inputs.java_distribution }}
+        server-id: central
+        server-username: MAVEN_USERNAME
+        server-password: MAVEN_CENTRAL_TOKEN
+        gpg-private-key: ${{ inputs.gpg_private_key }}
+        gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      env:
+        MAVEN_USERNAME: ${{ inputs.maven_username }}
+        MAVEN_CENTRAL_TOKEN: ${{ inputs.maven_token }}
+        MAVEN_GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}
+
+    - name: SNAPSHOT version integrity check on develop
+      if: github.ref_name == inputs.target_branch
+      shell: bash
+      run: |
+        mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep -q -- '-SNAPSHOT
+
+    - name: Ensure the proposed new version is higher than the latest
+      shell: bash
+      run: |
+        PROPOSED_NEW_VERSION=$(mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version)
+        TMP_POM=$(mktemp)
+        curl -H "Authorization: token ${{ inputs.token }}" \
+              -H "Accept: application/vnd.github.v3.raw" \
+              -O \
+              https://api.github.com/repos/${{ github.repository }}/contents/pom.xml?ref=${{ github.ref_name }} \
+              -o "$TMP_POM"
+        LATEST_VERSION=$(mvn -f "$TMP_POM" org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version)
+        rm "$TMP_POM"
+        
+        if [ "$(printf "%s\n%s" "$PROPOSED_NEW_VERSION" "$LATEST_VERSION" | sort -V | head -n1)" = "$PROPOSED_NEW_VERSION" ]; then
+          echo "Proposed new version is lower than the latest version!"
+          echo "$PROPOSED_NEW_VERSION <= $LATEST_VERSION"
+          exit 1
+        fi
+
+    - name: Deploy to Maven Central
+      shell: bash
+      run: mvn -U -B clean deploy -Drelease -DskipTests=${{ inputs.skip_tests }}
+      env:
+        MAVEN_USERNAME: ${{ inputs.maven_username }}
+        MAVEN_CENTRAL_TOKEN: ${{ inputs.maven_token }}
+        MAVEN_GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}
+
+    - name: Get latest tag
+      shell: bash
+      run: echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+
+    - name: Create GitHub release
+      shell: bash
+      run: |
+        gh release create ${{ env.tag }} --title ${{ env.tag }} --generate-notes
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+
+    - name: Create SNAPSHOT version branch
+      shell: bash
+      run: |
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        
+        # Get current commit SHA for entropy (Markus's suggestion a)
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        BRANCH_NAME="${{ inputs.snapshot_branch_name }}_${SHORT_SHA}"
+        
+        git checkout -b "$BRANCH_NAME" "${{ inputs.release_branch }}"
+        mvn versions:set versions:commit -DnextSnapshot
+        git ls-files | grep 'pom.xml | xargs git add
+        git commit --allow-empty -am "Update version to next SNAPSHOT"
+        git push origin "$BRANCH_NAME"
+        
+        echo SNAPSHOT_BRANCH="$BRANCH_NAME" >> $GITHUB_ENV
+
+    - name: Create PR for SNAPSHOT version
+      shell: bash
+      run: |
+        gh pr create --draft \
+          -B ${{ inputs.target_branch }} \
+          -H "$SNAPSHOT_BRANCH" \
+          -t "Update to next SNAPSHOT version" \
+          -b "Update to next SNAPSHOT version"
+      env:
+        GH_TOKEN: ${{ inputs.token }}
