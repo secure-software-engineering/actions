@@ -1,0 +1,49 @@
+name: Documentation Deployment
+description: Deploy documentation snapshots and releases to GitHub pages
+
+inputs:
+  name:
+    description: 'Name of the documentation'
+    required: true
+  title:
+    description: 'Title of the documentation'
+    required: true
+  gh-pages-branch:
+    description: 'The branch name where the gh pages are deployed to (default: gh-pages)'
+    required: false
+    default: 'gh-pages'
+  stable:
+    description: 'If true a stable version is deployed (default: false)'
+    required: false
+    default: 'false'
+  aliases:
+    description: 'List of aliases for the deployed version (default: latest'
+    required: false
+    default: 'latest'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.x
+
+    - name: Install Dependencies
+      shell: bash
+      run: pip install mike mkdocs-material mkdocs-tooltips git+https://github.com/RedisLabs/mkdocs-include.git git+https://github.com/swissiety/LspLexer4Pygments.git
+
+    - name: Configure git user
+      shell: bash
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+
+    - name: Deploy the Documentation
+      shell: bash
+      run: mike deploy ${{ inputs.name }} ${{ inputs.aliases }} --branch ${{ inputs.gh-pages-branch }} --push --update-aliases -t "${{ inputs.title }}"
+
+    - name: Create stable Version
+      if: inputs.stable == 'true'
+      shell: bash
+      run: mike set-default ${{ inputs.name }} --push
