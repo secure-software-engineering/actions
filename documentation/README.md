@@ -84,6 +84,9 @@ on:
   push:
     branches:
       - develop
+      
+concurrency:
+  group: gh-pages
 
 jobs:
   deploy-snapshot:
@@ -126,6 +129,9 @@ on:
   create:
     tags:
       - '*'
+
+concurrency:
+  group: gh-pages
 
 jobs:
   deploy-doc-stable:
