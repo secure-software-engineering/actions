@@ -31,9 +31,10 @@ dependabot/ - Auto-approve Dependabot PRs
 zombie-mode/ - Fully automated dependency management for unmaintained repositories
 
 #### Documentation
-documentation/handle-pr-preview/ - PR documentation previews
-documentation/pin-version/ - Branch-based documentation snapshots
-javadoc/ - Javadoc publishing to GitHub Pages
+
+- documentation/handle-pr-preview/ - Documentation Previews for PRs
+- documentation/handle-deployment/ - Documentation Deployments
+- javadoc/ - Javadoc publishing to GitHub Pages
 
 #### Version Management
 version/ - Automated version updates and releases for Maven projects
