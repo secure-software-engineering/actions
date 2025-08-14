@@ -151,7 +151,7 @@ jobs:
         fetch-depth: 0
 
     - name: Deploy Stable Documentation
-      uses: secure-software-engineering/actions/documentation/handle-deployment@fix/documentation-deployment
+      uses: secure-software-engineering/actions/documentation/handle-deployment@develop
       with:
         # We use the tag as name and title (e.g. x.y.z) and make the deployment stable
         # s.t. future deployments do not override this version
