@@ -126,7 +126,7 @@ name: Deploy Stable Documentation
 
 on:
   # Trigger on arbitrary created tags
-  create:
+  push:
     tags:
       - '*'
 
