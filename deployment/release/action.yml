@@ -1,0 +1,44 @@
+name: Update SNAPSHOT version
+description: Create a PR with the next SNAPSHOT version
+
+inputs:
+  token:
+    description: 'Token to authenticate the GitHub actions bot'
+    required: true
+  source-branch:
+    description: 'Branch to create the PR from'
+    required: true
+  target-branch:
+    description: 'Target branch for the PR'
+    required: true
+  snapshot-branch:
+    description: 'Name of the branch with the updated SNAPSHOT version (default: snapshot-version)'
+    required: false
+    default: 'snapshot-version'
+
+runs:
+  using: composite
+  steps:
+    - name: Set git user
+      shell: bash
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+
+    - name: Create branch and update to next SNAPSHOT version
+      shell: bash
+      run: |
+        git checkout -b ${{ inputs.snapshot-branch }} ${{ inputs.source-branch }}
+        mvn versions:set versions:commit -DnextSnapshot
+        git ls-files | grep 'pom.xml$' | xargs git add
+        git commit --allow-empty -am "Update version to next SNAPSHOT"
+        git push origin ${{ inputs.snapshot-branch }}
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+
+    - name: Create PR for SNAPSHOT version
+      shell: bash
+      run: |
+        gh pr create --draft -B ${{ inputs.target-branch }} -H ${{ inputs.snapshot-branch }} -t "Update to next SNAPSHOT version" -b "Update to next SNAPSHOT version"
+      env:
+        GH_TOKEN: ${{ inputs.token }}

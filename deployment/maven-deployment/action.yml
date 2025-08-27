@@ -1,0 +1,104 @@
+name: Deploy to Maven Central
+description: Action to deploy a Maven project to Maven Central
+
+inputs:
+  java-distribution:
+    description: 'The Java distribution to build the project'
+    required: true
+  java-version:
+    description: 'Java version to build the project'
+    required: true
+  maven-username:
+    description: 'Username for authentication to Maven Central'
+    required: true
+  maven-token:
+    description: 'Password or token for authentication to Maven Central'
+    required: true
+  gpg-private-key:
+    description: 'GPG private key to sign the deployed artefacts'
+    required: true
+  gpg-passphrase:
+    description: 'GPG passphrase of the GPG private key'
+    required: true
+  mvn-cli-args:
+    description: 'Arguments to add to the maven deploy command (default: "-DskipTests")'
+    required: false
+    default: '-DskipTests'
+  deploy-mode:
+    description: 'Mode for the deployment. Possible modes are "release" and "snapshot" (default: release)'
+    required: false
+    default: "release"
+  version-check:
+    description: 'Check whether the version to deploy is higher than the latest deployed version (default: false)'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Java and Credentials
+      uses: actions/setup-java@v4
+      with:
+        distribution: ${{ inputs.java-distribution }}
+        java-version: ${{ inputs.java-version }}
+        server-id: central
+        server-username: MAVEN_USERNAME
+        server-password: MAVEN_CENTRAL_TOKEN
+        gpg-private-key: ${{ inputs.gpg-private-key }}
+        gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      env:
+        MAVEN_USERNAME: ${{ inputs.maven-username }}
+        MAVEN_CENTRAL_TOKEN: ${{ inputs.maven-token }}
+        MAVEN_GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
+
+    # If we want to deploy a snapshot version, we have to make sure that the version ends with SNAPSHOT
+    - name: Check SNAPSHOT Version
+      if: ${{ inputs.deploy-mode == 'snapshot' }}
+      shell: bash
+      run: |
+        VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        echo "Detected version: $VERSION"
+        if [[ "$VERSION" != *-SNAPSHOT ]]; then
+          echo "Deploy mode is 'snapshot', but version is not a SNAPSHOT version"
+          exit 1
+        fi
+
+    # If we want to deploy a release version, we have to make sure that the version does not end with SNAPSHOT
+    - name: Check Release Version
+      if: ${{ inputs.deploy-mode == 'release' }}
+      shell: bash
+      run: |
+        VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        echo "Detected version: $VERSION"
+        if [[ "$VERSION" == *-SNAPSHOT ]]; then
+          echo "Deploy mode is 'release', but version is a SNAPSHOT version"
+          exit 1
+        fi
+
+    - name: Ensure the proposed new version is higher than the latest
+      if: ${{ inputs.version-check == 'true' }}
+      shell: bash
+      run: |
+        PROPOSED_NEW_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        TMP_POM=$(mktemp)
+        curl -H "Authorization: token ${{ inputs.token }}" \
+              -H "Accept: application/vnd.github.v3.raw" \
+              -O \
+              https://api.github.com/repos/${{ github.repository }}/contents/pom.xml?ref=${{ github.ref_name }} \
+              -o "$TMP_POM"
+        LATEST_VERSION=$(mvn -f "$TMP_POM" help:evaluate -Dexpression=project.version -q -DforceStdout)
+        rm "$TMP_POM"
+        
+        if [ "$(printf "%s\n%s" "$PROPOSED_NEW_VERSION" "$LATEST_VERSION" | sort -V | head -n1)" = "$PROPOSED_NEW_VERSION" ]; then
+          echo "Proposed new version is lower than the latest version!"
+          echo "$PROPOSED_NEW_VERSION <= $LATEST_VERSION"
+          exit 1
+        fi
+
+    - name: Run Maven Command
+      shell: bash
+      run: |
+        # -U force updates just to make sure we are using latest dependencies
+        # -B Batch mode (do not ask for user input), just in case
+        mvn clean deploy -U -B ${{ inputs.mvn-cli-args }}
+
