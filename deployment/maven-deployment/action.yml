@@ -44,8 +44,11 @@ runs:
         server-id: central
         server-username: ${{ inputs.maven-username }}
         server-password: ${{ inputs.maven-token }}
-        gpg-private-key: ${{ inputs.gpg-private-key }}
-        gpg-passphrase: ${{ inputs.gpg-passphrase }}
+
+    - name: Import GPG key
+      shell: bash
+      run: |
+        echo "${{ inputs.gpg-private-key }}" | base64 -d | gpg --batch --import
 
     # If we want to deploy a snapshot version, we have to make sure that the version ends with SNAPSHOT
     - name: Check SNAPSHOT Version
@@ -97,4 +100,6 @@ runs:
         # -U force updates just to make sure we are using latest dependencies
         # -B Batch mode (do not ask for user input), just in case
         mvn clean deploy -U -B ${{ inputs.mvn-cli-args }}
+      env:
+        MAVEN_GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
 
