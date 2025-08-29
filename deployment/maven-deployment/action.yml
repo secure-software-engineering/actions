@@ -48,7 +48,7 @@ runs:
     - name: Detect key format
       shell: bash
       run: |
-        KEY="${{ secrets.GPG_PRIVATE_KEY }}"
+        KEY="${{ inputs.gpg-private-key }}"
         if echo "$KEY" | grep -q "BEGIN PGP PRIVATE KEY BLOCK"; then
           echo "ASCII-armored key"
         else
