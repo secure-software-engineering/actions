@@ -45,6 +45,16 @@ runs:
         server-username: ${{ inputs.maven-username }}
         server-password: ${{ inputs.maven-token }}
 
+    - name: Detect key format
+      shell: bash
+      run: |
+        KEY="${{ secrets.GPG_PRIVATE_KEY }}"
+        if echo "$KEY" | grep -q "BEGIN PGP PRIVATE KEY BLOCK"; then
+          echo "ASCII-armored key"
+        else
+          echo "Binary key (probably base64-encoded)"
+        fi
+
     - name: Import GPG key
       shell: bash
       run: |
