@@ -42,14 +42,10 @@ runs:
         distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
         server-id: central
-        server-username: MAVEN_USERNAME
-        server-password: MAVEN_CENTRAL_TOKEN
+        server-username: ${{ inputs.maven-username }}
+        server-password: ${{ inputs.maven-token }}
         gpg-private-key: ${{ inputs.gpg-private-key }}
-        gpg-passphrase: MAVEN_GPG_PASSPHRASE
-      env:
-        MAVEN_USERNAME: ${{ inputs.maven-username }}
-        MAVEN_CENTRAL_TOKEN: ${{ inputs.maven-token }}
-        MAVEN_GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
+        gpg-passphrase: ${{ inputs.gpg-passphrase }}
 
     # If we want to deploy a snapshot version, we have to make sure that the version ends with SNAPSHOT
     - name: Check SNAPSHOT Version
