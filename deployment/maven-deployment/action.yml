@@ -55,22 +55,37 @@ runs:
           echo "Binary key (probably base64-encoded)"
         fi
 
-    - name: Import GPG key
+    - name: Import GPG key (ASCII, base64, or invalid)
       shell: bash
       run: |
         set -e
 
-        # Remove leading/trailing whitespace
+        # Trim leading/trailing whitespace
         KEY="$(echo "${{ inputs.gpg-private-key }}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
-        # Detect ASCII-armored
+        # Case 1: ASCII-armored key
         if echo "$KEY" | grep -q "BEGIN PGP PRIVATE KEY BLOCK"; then
           echo "Detected ASCII-armored key"
           printf '%s\n' "$KEY" | gpg --batch --import
-        else
-          echo "Detected base64-encoded binary key"
-          echo "$KEY" | base64 -d | gpg --batch --import
+          exit 0
         fi
+
+        # Case 2: Base64-encoded key (try decoding safely)
+        if echo "$KEY" | base64 -d >/tmp/key.gpg 2>/dev/null; then
+          if file /tmp/key.gpg | grep -qi "PGP private key"; then
+            echo "Detected base64-encoded binary key"
+            gpg --batch --import /tmp/key.gpg
+            rm -f /tmp/key.gpg
+            exit 0
+          fi
+        fi
+
+        # Case 3: Raw binary or invalid format
+        echo "❌ Unsupported or invalid GPG key format detected."
+        echo "GitHub Secrets cannot store raw binary keys safely."
+        echo "Please provide either an ASCII-armored key (gpg --armor --export-secret-keys)"
+        echo "or a base64-encoded binary export (gpg --export-secret-keys | base64 -w0)."
+        exit 1
 
     # If we want to deploy a snapshot version, we have to make sure that the version ends with SNAPSHOT
     - name: Check SNAPSHOT Version
