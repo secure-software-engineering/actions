@@ -36,6 +36,17 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Debug input (check if key is passed correctly)
+      shell: bash
+      run: |
+        if [ -z "${KEY}" ]; then
+          echo "❌ gpg-private-key input is EMPTY"
+        else
+          echo "✅ gpg-private-key length: ${#KEY} characters"
+          echo "✅ first 50 chars: ${KEY:0:50}..."
+        fi
+      env:
+        KEY: ${{ inputs['gpg-private-key'] }}
     - name: Set up Java and Credentials
       uses: actions/setup-java@v4
       with:
