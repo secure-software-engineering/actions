@@ -58,7 +58,19 @@ runs:
     - name: Import GPG key
       shell: bash
       run: |
-        echo "${{ inputs.gpg-private-key }}" | base64 -d | gpg --batch --import
+        set -e
+
+        # Remove leading/trailing whitespace
+        KEY="$(echo "${{ inputs.gpg-private-key }}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+        # Detect ASCII-armored
+        if echo "$KEY" | grep -q "BEGIN PGP PRIVATE KEY BLOCK"; then
+          echo "Detected ASCII-armored key"
+          printf '%s\n' "$KEY" | gpg --batch --import
+        else
+          echo "Detected base64-encoded binary key"
+          echo "$KEY" | base64 -d | gpg --batch --import
+        fi
 
     # If we want to deploy a snapshot version, we have to make sure that the version ends with SNAPSHOT
     - name: Check SNAPSHOT Version
