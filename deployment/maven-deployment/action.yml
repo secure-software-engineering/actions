@@ -59,12 +59,16 @@ runs:
       shell: bash
       run: |
         set -e
+        
+        if echo ${{ inputs.gpg-private-key }} | grep -q "PGP PRIVATE KEY BLOCK"; then
+          echo "Detected ASCII-armored key 1"
+        fi
 
         # Trim leading/trailing whitespace
         KEY="$(echo "${{ inputs.gpg-private-key }}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
         # Case 1: ASCII-armored key
-        if echo "$KEY" | grep -q "BEGIN PGP PRIVATE KEY BLOCK"; then
+        if echo "$KEY" | grep -q "PGP PRIVATE KEY BLOCK"; then
           echo "Detected ASCII-armored key"
           printf '%s\n' "$KEY" | gpg --batch --import
           exit 0
