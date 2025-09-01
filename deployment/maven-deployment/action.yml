@@ -60,12 +60,18 @@ runs:
       run: |
         set -e
         
-        if echo ${{ inputs.gpg-private-key }} | grep -q "PGP PRIVATE KEY BLOCK"; then
+        if echo ${{ inputs['gpg-private-key'] }} | grep -q "PGP PRIVATE KEY BLOCK"; then
           echo "Detected ASCII-armored key 1"
+        fi
+        
+        KEY_RAW="${{ inputs['gpg-private-key'] }}"
+        if [ -z "$KEY_RAW" ]; then
+          echo "❌ gpg-private-key input is empty."
+          exit 1
         fi
 
         # Trim leading/trailing whitespace
-        KEY="$(echo "${{ inputs.gpg-private-key }}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        KEY="$(echo "${{ inputs['gpg-private-key'] }}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
         # Case 1: ASCII-armored key
         if echo "$KEY" | grep -q "PGP PRIVATE KEY BLOCK"; then
