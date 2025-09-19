@@ -18,17 +18,18 @@ It provides the following features:
 
 #### Inputs
 
-| Name                | Required | Default       | Description                                                                                      |
-|---------------------|----------|---------------|--------------------------------------------------------------------------------------------------|
-| `java-distribution` | Yes      | —             | Java distribution to use (e.g., `adopt`, `temurin`).                                             |
-| `java-version`      | Yes      | —             | Java version to use (e.g., `11`, `17`).                                                          |
-| `maven-username`    | Yes      | —             | Username for Maven Central or Sonatype (e.g. `deployment` for token based authentication).       |
-| `maven-token`       | Yes      | —             | User token or password for Maven Central or Sonatype.                                            |
-| `gpg-private-key`   | Yes      | —             | Armored GPG private key for signing artifacts.                                                   |
-| `gpg-passphrase`    | Yes      | —             | Passphrase for the GPG private key.                                                              |
-| `mvn-cli-args`      | No       | `-DskipTests` | Additional arguments passed to the Maven deploy command.                                         |
-| `deploy-mode`       | No       | `release`     | Deployment mode: `release` or `snapshot`.                                                        |
-| `version-check`     | No       | `false`       | If `true`, a check is performed to ensure the new version is higher than the last committed one. |
+| Name                 | Required | Default       | Description                                                                                      |
+|----------------------|----------|---------------|--------------------------------------------------------------------------------------------------|
+| `java-distribution`  | Yes      | —             | Java distribution to use (e.g., `adopt`, `temurin`).                                             |
+| `java-version`       | Yes      | —             | Java version to use (e.g., `11`, `17`).                                                          |
+| `server-id`          | Yes      | —             | ID of the server to deploy to (e.g. `central`)                                                   |
+| `server-username`    | Yes      | —             | Username for Maven Central or Sonatype (e.g. `deployment` for token based authentication).       |
+| `server-password`    | Yes      | —             | User token or password for Maven Central or Sonatype.                                            |
+| `gpg-private-key`    | Yes      | —             | Armored GPG private key for signing artifacts.                                                   |
+| `gpg-passphrase`     | Yes      | —             | Passphrase for the GPG private key.                                                              |
+| `mvn-cli-args`       | No       | `-DskipTests` | Additional arguments passed to the Maven deploy command.                                         |
+| `deploy-mode`        | No       | `release`     | Deployment mode: `release` or `snapshot`.                                                        |
+| `version-check`      | No       | `false`       | If `true`, a check is performed to ensure the new version is higher than the last committed one. |
 
 The action expects an armored GPG key. You can export your key with the following command: `gpg --armor --export-secret-keys <key_id> gpg_key.asc`.
 
@@ -66,8 +67,8 @@ jobs:
         with:
           java-distribution: adopt
           java-version: 11
-          maven-username: ${{ secrets.MAVEN_USERNAME }}
-          maven-token: ${{ secrets.MAVEN_TOKEN }}
+          server-username: ${{ secrets.MAVEN_USERNAME }}
+          server-password: ${{ secrets.MAVEN_TOKEN }}
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
           mvn-cli-args: '-DskipTests -Pdeployment'

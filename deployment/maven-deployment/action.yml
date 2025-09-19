@@ -8,10 +8,13 @@ inputs:
   java-version:
     description: 'Java version to build the project'
     required: true
-  maven-username:
+  server-id:
+    description: 'Id of the server to deploy to'
+    required: true
+  server-username:
     description: 'Username for authentication to Maven Central'
     required: true
-  maven-token:
+  server-password:
     description: 'Password or token for authentication to Maven Central'
     required: true
   gpg-private-key:
@@ -41,9 +44,9 @@ runs:
       with:
         distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
-        server-id: ossrh
-        server-username: ${{ inputs.maven-username }}
-        server-password: ${{ inputs.maven-token }}
+        server-id: ${{ inputs.server-id }}
+        server-username: ${{ inputs.server-username }}
+        server-password: ${{ inputs.server-password }}
         gpg-private-key: ${{ inputs.gpg-private-key }}
         gpg-passphrase: ${{ inputs.gpg-passphrase }}
 
@@ -97,5 +100,3 @@ runs:
         # -U force updates just to make sure we are using latest dependencies
         # -B Batch mode (do not ask for user input), just in case
         mvn clean deploy -U -B ${{ inputs.mvn-cli-args }}
-      env:
-        MAVEN_GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
