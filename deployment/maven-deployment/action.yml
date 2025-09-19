@@ -100,3 +100,5 @@ runs:
         # -U force updates just to make sure we are using latest dependencies
         # -B Batch mode (do not ask for user input), just in case
         mvn clean deploy -U -B ${{ inputs.mvn-cli-args }}
+      env:
+        MAVEN_GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
