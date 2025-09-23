@@ -5,7 +5,7 @@ inputs:
     description: 'GitHub token with approval permissions'
     required: true
   should-approve:
-    description: 'should workflow approve the PR'
+    description: 'should the workflow approve the PR'
     required: false
     default: true
   should-merge:
@@ -17,23 +17,52 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Check (trivial) actor context
+      shell: bash
+      run: |      
+        if [[ "${{ github.actor }}" != "dependabot[bot]" ]] || \
+        [[ "${{ github.event.pull_request.user.login }}" != "dependabot[bot]" ]] || \
+        [[ "${{ github.event.pull_request.user.type }}" != "Bot" ]] || \
+        [[ "${{ github.event_name }}" != "pull_request" ]]; then
+          echo "This PR is not from Dependabot.\nFailing."
+          exit 1
+        fi
+
+    - name: Verify that dependency update commit's signature is from Dependabot
+      shell: bash
+      run: |
+        RESPONSE=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/$REPO/commits/$COMMIT_SHA)
+        
+        VERIFIED=$(jq -r '.commit.verification.verified' $RESPONSE)
+        REASON=$(jq -r '.commit.verification.reason' $RESPONSE)
+        
+        if [[ "$VERIFIED" != "true" || "$REASON" != "valid" ]]; then
+          echo "Commit is not verified: ${{ REASON }} \nFailing."
+          exit 1
+        fi
+
+      env:
+        COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        REPO: ${{ github.repository }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+
     - name: Approve and Merge PR
       shell: bash
-      if: ${{ github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'}}
       run: |
         if [ "${{ inputs.should-approve }}" = "true" ]; then
           echo "Approving PR..."
           gh pr review --approve "$PR_URL"
         else
-          echo "Skipping approval"
+          echo "Skipping approval."
         fi
 
         if [ "${{ inputs.should-merge }}" = "true" ]; then
           echo "Merging PR..."
           gh pr merge --squash --auto "$PR_URL"
         else
-          echo "Skipping merge"
+          echo "Skipping merge."
         fi
+
       env:
         PR_URL: ${{ github.event.pull_request.html_url }}
         GITHUB_TOKEN: ${{ inputs.token }}
