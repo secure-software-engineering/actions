@@ -8,9 +8,12 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Approve PR
+    - name: Approve and Merge PR
       shell: bash
-      run: gh pr review --approve "$PR_URL"
+      if: ${{ github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'}}
+      run: |
+        gh pr review --approve "$PR_URL"
+        gh pr merge --squash --auto "$PR_URL"
       env:
         PR_URL: ${{ github.event.pull_request.html_url }}
-        GH_TOKEN: ${{ inputs.token }}
+        GITHUB_TOKEN: ${{ inputs.token }}
