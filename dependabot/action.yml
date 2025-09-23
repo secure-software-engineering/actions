@@ -4,13 +4,36 @@ inputs:
   token:
     description: 'GitHub token with approval permissions'
     required: true
+  should-approve:
+    description: 'should workflow approve the PR'
+    required: false
+    default: true
+  should-merge:
+    description: 'should the workflow merge the PR'
+    required: false
+    default: true
+
 
 runs:
   using: "composite"
   steps:
-    - name: Approve PR
+    - name: Approve and Merge PR
       shell: bash
-      run: gh pr review --approve "$PR_URL"
+      if: ${{ github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'}}
+      run: |
+        if [ "${{ inputs.should-approve }}" = "true" ]; then
+          echo "Approving PR..."
+          gh pr review --approve "$PR_URL"
+        else
+          echo "Skipping approval"
+        fi
+
+        if [ "${{ inputs.should-merge }}" = "true" ]; then
+          echo "Merging PR..."
+          gh pr merge --squash --auto "$PR_URL"
+        else
+          echo "Skipping merge"
+        fi
       env:
         PR_URL: ${{ github.event.pull_request.html_url }}
-        GH_TOKEN: ${{ inputs.token }}
+        GITHUB_TOKEN: ${{ inputs.token }}
