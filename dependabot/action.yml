@@ -31,20 +31,27 @@ runs:
     - name: Verify that dependency update commit's signature is from Dependabot
       shell: bash
       run: |
+        # Fetch commit information
         RESPONSE=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/$REPO/commits/$COMMIT_SHA)
         
-        VERIFIED=$(jq -r '.commit.verification.verified' $RESPONSE)
-        REASON=$(jq -r '.commit.verification.reason' $RESPONSE)
-        
-        if [[ "$VERIFIED" != "true" || "$REASON" != "valid" ]]; then
-          echo "Commit is not verified: $REASON \nFailing."
+        if [ $? -ne 0 ]; then
+          echo "Failed to fetch commit($COMMIT_SHA) details for the triggering PR.\nFailning."
           exit 1
         fi
-
+        
+        # Extract verification status and reason using jq
+        VERIFIED=$(echo "$RESPONSE" | jq -r '.commit.verification.verified')
+        REASON=$(echo "$RESPONSE" | jq -r '.commit.verification.reason')
+        
+        # Check if the commit is verified
+        if [[ "$VERIFIED" != "true" || "$REASON" != "valid" ]]; then
+          echo "Commit is not verified: $REASON. Failing."
+          exit 1
+        fi
       env:
         COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         REPO: ${{ github.repository }}
-        GITHUB_TOKEN: ${{ inputs.token }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Approve and Merge PR
       shell: bash
