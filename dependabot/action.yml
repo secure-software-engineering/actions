@@ -37,7 +37,7 @@ runs:
         REASON=$(jq -r '.commit.verification.reason' $RESPONSE)
         
         if [[ "$VERIFIED" != "true" || "$REASON" != "valid" ]]; then
-          echo "Commit is not verified: ${{ REASON }} \nFailing."
+          echo "Commit is not verified: $REASON \nFailing."
           exit 1
         fi
 
