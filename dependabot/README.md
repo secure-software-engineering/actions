@@ -24,6 +24,10 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   ApproveAndMerge:
     name: Auto approve Dependabot PRs
