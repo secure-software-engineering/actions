@@ -51,7 +51,7 @@ runs:
       env:
         COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         REPO: ${{ github.repository }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ inputs.token }}
 
     - name: Approve and Merge PR
       shell: bash
