@@ -36,7 +36,7 @@ runs:
         RESPONSE=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/$REPO/commits/$COMMIT_SHA)
         
         if [ $? -ne 0 ]; then
-          echo "Failed to fetch commit($COMMIT_SHA) details for the triggering PR.\nFailning."
+          echo "Failed to fetch commit($COMMIT_SHA) details for the triggering PR.\nFailing."
           exit 1
         fi
         
@@ -70,7 +70,7 @@ runs:
           # hint: this does not check if the PAT token user approved the PR - just if there is approval already
           if [[ "$REVIEWCOUNT" -eq 0 ]]; then        
             echo "Approving PR..."
-            gh pr review --approve --body "Auto-approved." "$PR_URL" 
+            gh pr review --approve --body "Auto-approved." "$PR_URL"
           else
             echo "PR already approved."
           fi
