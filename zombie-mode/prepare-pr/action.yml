@@ -100,16 +100,29 @@ runs:
           echo "No existing release PR found"
         fi
       env:
-        GH_TOKEN: ${{ inputs.github-token }}
+        GH_TOKEN: ${{ inputs.token }}
 
     - name: Create release branch and update version
       if: steps.check_updates.outputs.dependency_commits > 0 && steps.check_pr.outputs.pr_exists == 'false'
       shell: bash
       run: |
         NEW_VERSION="${{ steps.version.outputs.new_version }}"
+        BRANCH_NAME="zombie-release-$NEW_VERSION"
+        
+        # Check if branch exists remotely and delete it
+        if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+          echo "Remote branch $BRANCH_NAME exists, deleting it..."
+          git push origin --delete "$BRANCH_NAME" || echo "Failed to delete remote branch, continuing..."
+        fi
+        
+        # Delete local branch if it exists
+        if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
+          echo "Local branch $BRANCH_NAME exists, deleting it..."
+          git branch -D "$BRANCH_NAME"
+        fi
         
         # Create release branch
-        git checkout -b "zombie-release-$NEW_VERSION"
+        git checkout -b "$BRANCH_NAME"
         
         # Update version in specified file if it exists
         if [ -f "${{ inputs.version-file }}" ]; then
