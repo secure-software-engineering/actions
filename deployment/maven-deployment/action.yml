@@ -47,7 +47,7 @@ runs:
         server-id: ${{ inputs.server-id }}
         server-username: MAVEN_USERNAME                 # Env var that holds the central publisher user name
         server-password: MAVEN_CENTRAL_TOKEN            # Env var that holds the central publisher user token
-        gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }} # Substituted with the value stored in the referenced secret
+        gpg-private-key: ${{ inputs.gpg-private-key }} # Substituted with the value stored in the referenced secret
         gpg-passphrase: MAVEN_GPG_PASSPHRASE            # Env var that holds the key's passphrase
 
     # If we want to deploy a snapshot version, we have to make sure that the version ends with SNAPSHOT
