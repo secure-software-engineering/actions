@@ -45,10 +45,10 @@ runs:
         distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
         server-id: ${{ inputs.server-id }}
-        server-username: ${{ inputs.server-username }}
-        server-password: ${{ inputs.server-password }}
-        gpg-private-key: ${{ inputs.gpg-private-key }}
-        gpg-passphrase: ${{ inputs.gpg-passphrase }}
+        server-username: MAVEN_USERNAME                 # Env var that holds the central publisher user name
+        server-password: MAVEN_CENTRAL_TOKEN            # Env var that holds the central publisher user token
+        gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }} # Substituted with the value stored in the referenced secret
+        gpg-passphrase: MAVEN_GPG_PASSPHRASE            # Env var that holds the key's passphrase
 
     # If we want to deploy a snapshot version, we have to make sure that the version ends with SNAPSHOT
     - name: Check SNAPSHOT Version
@@ -101,4 +101,6 @@ runs:
         # -B Batch mode (do not ask for user input), just in case
         mvn clean deploy -U -B ${{ inputs.mvn-cli-args }}
       env:
+        MAVEN_USERNAME: ${{ inputs.server-username }}
+        MAVEN_CENTRAL_TOKEN: ${{ inputs.server-password }}
         MAVEN_GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
