@@ -46,13 +46,13 @@ runs:
     - name: Install dependencies
       shell: bash
       # hint: keep in sync with list in documentation/deployment
-      run: | 
+      run: |
         pip install \
-          mike \                                                    # versioned mkdocs
-          mkdocs-material \                                         # theme
-          mkdocs-tooltips \                                         # tooltips
-          mkdocs-include-markdown-plugin \                          # include (parts) of other files
-          git+https://github.com/swissiety/LspLexer4Pygments.git    # syntax highlighting via lsp server
+        mike==1.1.2 \                                                    # versioned mkdocs
+        mkdocs-material==9.5.13 \                                        # theme
+        mkdocs-tooltips==0.4.0 \                                         # tooltips
+        mkdocs-include-markdown-plugin==4.0.4 \                          # include (parts) of other files
+        git+https://github.com/swissiety/LspLexer4Pygments.git           # syntax highlighting via lsp server
 
     - name: Configure git user
       shell: bash
