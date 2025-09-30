@@ -16,7 +16,7 @@ runs:
     - name: Configuration
       shell: bash
       run: |
-        echo 'base-url="https://$OWNER.github.io/$REPO/"'
+        echo "base-url=https://${OWNER}.github.io/${REPO}/" >> $GITHUB_ENV
 
       env:
         REPO: ${{ github.event.repository.name }}
