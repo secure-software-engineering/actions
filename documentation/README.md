@@ -11,20 +11,16 @@ A possible workflow **doc_preview.yml** can look like this:
 name: Documentation Preview
 
 on:
-  # Only trigger on pull requests that target the main branch of the repository
-  # and when there are changes to documentation related files
   pull_request:
-    branch:
-      - main
     types:
       - opened
-      - closed                        # Required, otherwise the preview is not deleted
+      - closed
       - synchronize
       - reopened
-    paths:                            # Only trigger on changes in documentation related files
+    paths:
       - mkdocs.yml
       - docs/**
-      - .github/workflows/documentation-preview.yml     # same name as this file!
+      - .github/workflows/documentation-pr-preview.yml
 
 concurrency:
   group: gh-pages
@@ -33,24 +29,18 @@ jobs:
   deploy-preview:
     name: Preview documentation
     runs-on: ubuntu-latest
-    # These permissions are needed to push and deploy the pages files and comment the link to the documentation
     permissions:
       contents: write
-      pull-requests: write
+      pull-requests: write        # for posting a comment
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0         # mike needs full history to push to gh-pages
 
       - name: Create Documentation Preview
-        uses: secure-software-engineering/actions/documentation/handle-pr-preview@develop
-        with:
-          # We create a preview with a title and name that depend on the current pull 
-          # request (e.g. on pull request #100, we have the name 'pr-100' and title 'Preview for PR-100')
-          preview-name: pr-${{ github.event.pull_request.number }}
-          preview-title: Preview for PR-${{ github.event.pull_request.number }}
+        uses: secure-software-engineering/actions/documentation/pr-preview@develop
 
 ```
 This workflow triggers when there are changes in documentation related files.
