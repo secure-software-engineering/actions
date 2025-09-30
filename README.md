@@ -12,22 +12,10 @@ Dependabot: Add .github/dependabot.yml for weekly dependency updates
 GitHub Pages: Enable for documentation deployment
 
 
-## Basic Dependabot Config
-```yaml
-version: 2
-updates:
-   - package-ecosystem: "maven"
-     directory: "/"
-     schedule:
-        interval: "weekly"
-        day: "monday"
-        time: "06:00"   # so that it is running before the workday starts
-```
-
 ##  Available Actions
 
 ### Dependency Management
-dependabot/ - Auto-approve Dependabot PRs
+dependabot/ - automatically merge and approve successful Dependabot PRs
 zombie-mode/ - Fully automated dependency management for unmaintained repositories
 
 #### Documentation

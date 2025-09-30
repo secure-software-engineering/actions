@@ -15,6 +15,28 @@ Increases attack surface by possibly introducing compromised code from dependenc
 But If dependencies are updated "blindly" anyways this workflow is in no way different.
 
 ### Configuration
+
+Basic Dependabot config `.github/dependabot.yml`
+
+```yaml
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: "/"
+    schedule:
+      interval: cron
+      time: "0 6 * * 1-5"
+    cooldown:
+      - semver-major: 30
+      - semver-minor: 14
+      - semver-patch: 10
+    open-pull-requests-limit: 10
+```
+
 - enable `status checks` in `Settings / Branch protection rules` so only valid code is merged
 - enable `Allow auto merge` in `Settings / General` to make automatic merging possible
 - store a Personal Access Token in `dependabot secrets` e.g. as `AUTO_MERGE_PAT` to give write permissions
@@ -33,10 +55,6 @@ name: Handle Dependabot PRs
 on:
   pull_request:
     types: [ opened, reopened, synchronize ]
-
-permissions:
-  contents: write
-  pull-requests: write
 
 jobs:
   ApproveAndMerge:

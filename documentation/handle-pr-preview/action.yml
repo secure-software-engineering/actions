@@ -1,14 +1,12 @@
 name: Documentation Preview
-description: Create and deploy a preview of the documentation
+description: handle preview of the documentation
 
 inputs:
-  preview-name:
-    description: 'The name of the preview'
-    required: true
-  preview-title:
-    description: 'The title of the preview'
-    required: true
-  gh-pages-branch:
+  title:
+    description: 'The title of the preview - as shown on the version selector'
+    required: false
+    default: ''         # if not set we use the pr number
+  pages-branch:
     description: 'The branch name where the gh pages are deployed to (default: gh-pages)'
     required: false
     default: 'gh-pages'
@@ -16,10 +14,25 @@ inputs:
     description: 'If true a comment with a link to the preview is added to the PR (default: true)'
     required: false
     default: 'true'
+  latest-name:
+    description: 'latest version to find the changed pages'
+    required: false
+    default: 'latest'
 
 runs:
   using: composite
   steps:
+    - name: Configuration
+      shell: bash
+      run: |
+        echo 'name="pr-${{ github.event.pull_request.number }}"' >> $GITHUB_ENV
+        
+        if [ -z "${{ inputs.title }}" ]; then
+          echo "title=Preview for PR-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+        else
+          echo "title=${{ inputs.title }}" >> $GITHUB_ENV
+        fi
+
     - name: Set up python
       uses: actions/setup-python@v5
       with:
@@ -27,7 +40,7 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: pip install mike mkdocs-material mkdocs-tooltips git+https://github.com/RedisLabs/mkdocs-include.git git+https://github.com/swissiety/LspLexer4Pygments.git
+      run: pip install -r documentation/requirements.txt
 
     - name: Configure git user
       shell: bash
@@ -37,7 +50,13 @@ runs:
 
     - name: Deploy the Preview
       shell: bash
-      run: mike deploy --branch ${{ inputs.gh-pages-branch }} --push --update-aliases -t "${{ inputs.preview-title }}" ${{ inputs.preview-name }}
+      run: mike deploy --branch ${{ inputs.gh-pages-branch }} --push --update-aliases -t "${{ env.title }}" ${{ env.name }}
+
+    - name: Diff changed files to see what was changed
+      if: inputs.enable-comment == 'true' && github.event.action != 'closed'
+      shell: bash
+      run: |
+        FILES=$(git --no-pager diff --stat HEAD origin/${{ inputs.gh-pages-branch }} | grep ".htm")
 
     - name: Comment Link to Preview
       if: inputs.enable-comment == 'true' && github.event.action != 'closed'
@@ -45,9 +64,12 @@ runs:
       with:
         recreate: true
         message: |
-          Detected changes in documentation files: [Documentation Preview](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ inputs.preview-name }}/)
+          Documentation was updated: [Preview](https://$OWNER.github.io/$REPO/${{ env.name }}/)
+      env:
+        OWNER: ${{ github.repository_owner }}
+        REPO: ${{ github.event.repository.name }}
 
     - name: Delete the Preview
       if: github.event.action == 'closed'
       shell: bash
-      run: mike delete --push ${{ inputs.preview-name }}
+      run: mike delete --push ${{ env.name }}
