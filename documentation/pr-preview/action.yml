@@ -26,12 +26,16 @@ runs:
       shell: bash
       run: |
         echo 'name="pr-${{ github.event.pull_request.number }}"' >> $GITHUB_ENV
+        echo 'base-url="https://$OWNER.github.io/$REPO/"'
         
         if [ -z "${{ inputs.title }}" ]; then
           echo "title=Preview for PR-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
         else
           echo "title=${{ inputs.title }}" >> $GITHUB_ENV
         fi
+
+      env:
+        REPO: ${{ github.event.repository.name }}
 
     - name: Set up python
       uses: actions/setup-python@v5
@@ -52,11 +56,45 @@ runs:
       shell: bash
       run: mike deploy --branch ${{ inputs.gh-pages-branch }} --push --update-aliases -t "${{ env.title }}" ${{ env.name }}
 
-    - name: Diff changed files to see what was changed
+    - name: summarize changed files to create links to the updated pages
       if: inputs.enable-comment == 'true' && github.event.action != 'closed'
       shell: bash
+      id: diff
       run: |
-        FILES=$(git --no-pager diff --stat HEAD origin/${{ inputs.gh-pages-branch }} | grep ".htm")
+        DIFF=$(diff -qr "latest" "${name}" | grep '\.html' || true)
+        
+        CHANGES=""
+        ADDITIONS=""
+        DELETIONS=""
+        
+        while IFS= read -r line; do
+          if [[ $line == Files* ]]; then
+            # Modified file
+            FILE_PATH=$(echo "$line" | sed -E "s|.* and ${name}/(.*) differ|\1|")
+            URL="${base_url}/${FILE_PATH}"
+            CHANGES+="- [$FILE_PATH]($URL)"$'\n'
+          elif [[ $line == Only\ in\ ${name}:* ]]; then
+            # Added file
+            FILE_PATH=$(echo "$line" | sed -E "s|Only in ${name}: ||")
+            URL="${base_url}/${FILE_PATH}"
+            ADDITIONS+="- [$FILE_PATH]($URL)"$'\n'
+          elif [[ $line == Only\ in\ latest:* ]]; then
+            # Deleted file
+            FILE_PATH=$(echo "$line" | sed -E "s|Only in latest: ||")
+            DELETIONS+="- ~~${FILE_PATH}~~ (deleted)"$'\n'
+          fi
+        done <<< "$DIFF"
+        
+        # Create summary
+        SUMMARY="""
+        [[ -n "$ADDITIONS" ]] && SUMMARY+="*New*\n$ADDITIONS\n"
+        [[ -n "$CHANGES" ]] && SUMMARY+="*Modified*\n$CHANGES\n"
+        [[ -n "$DELETIONS" ]] && SUMMARY+="*Deleted*\n$DELETIONS\n"
+        [[ -n "$SUMMARY" ]] && SUMMARY+="No content changes found in sites. Likely a change in design,js etc.\n"
+        
+        echo "links<<EOF" >> "$GITHUB_OUTPUT"
+        echo "$SUMMARY" >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
 
     - name: Comment Link to Preview
       if: inputs.enable-comment == 'true' && github.event.action != 'closed'
@@ -64,10 +102,11 @@ runs:
       with:
         recreate: true
         message: |
-          Documentation was updated: [Preview](https://$OWNER.github.io/$REPO/${{ env.name }}/)
+          Documentation was updated: [Preview](${{ env.base-url}}/${{ env.name }}/)
+          ${{ steps.diff.outputs.links }}
       env:
         OWNER: ${{ github.repository_owner }}
-        REPO: ${{ github.event.repository.name }}
+
 
     - name: Delete the Preview
       if: github.event.action == 'closed'
