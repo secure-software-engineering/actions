@@ -14,7 +14,7 @@ inputs:
     description: 'If true a comment with a link to the preview is added to the PR (default: true)'
     required: false
     default: 'true'
-  latest-name:
+  latest-directory:
     description: 'latest version to find the changed pages'
     required: false
     default: 'latest'
@@ -26,7 +26,7 @@ runs:
       shell: bash
       run: |
         echo "name=pr-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-        echo "base-url=https://${OWNER}.github.io/${REPO}/" >> $GITHUB_ENV
+        echo "base-url=https://${OWNER}.github.io/${REPO}" >> $GITHUB_ENV
         
         if [ -z "${TITLE}" ]; then
           echo "title=Preview for PR-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
@@ -38,7 +38,6 @@ runs:
         REPO: ${{ github.event.repository.name }}
         OWNER: ${{ github.repository_owner }}
         TITLE: ${{ inputs.title }}
-
 
     - name: Set up python
       uses: actions/setup-python@v5
@@ -70,17 +69,17 @@ runs:
       id: diff
       run: |
         # sanity checks        
-        if [[ ! -d "latest" ]]; then
-          echo 'This seems to be the first version of the documentation - no documentation found for "latest".'
+        if [[ ! -d "${LATEST_DIR}" ]]; then
+          echo "This seems to be the first version of the documentation - no documentation found for ${LATEST_DIR}."
           echo 'summary=""' >> $GITHUB_OUTPUT
           exit 0;
-        elif [[ ! -d "${name}" ]]; then
+        elif [[ ! -d "${{ env.name }}" ]]; then
           echo "No documentation found for preview ${{ env.name }}"
           echo 'summary=""' >> $GITHUB_OUTPUT
           exit 0;
         fi
 
-        DIFF=$(diff -qr "latest" "${name}" | grep '\.html' || true)
+        DIFF=$(diff -qr "${LATEST_DIR}" "${{ env.name }}" | grep '\.html' || true)
         
         CHANGES=""
         ADDITIONS=""
@@ -90,18 +89,18 @@ runs:
         while IFS= read -r line; do
           if [[ $line == Files* ]]; then
             # Modified file
-            FILE_PATH=$(echo "$line" | sed -E "s|.* and ${name}/(.*) differ|\1|")
-            URL="${base_url}/${FILE_PATH}"
-            CHANGES+="- [$FILE_PATH]($URL)"$'\n'
-          elif [[ $line == Only\ in\ ${name}:* ]]; then
+            PATH=$(echo "$line" | sed -E "s|.* and ${{ env.name }}/(.*) differ|\1|")
+            URL="${{env.base_url}}/${PATH}"
+            CHANGES+="- [$PATH]($URL)"$'\n'
+          elif [[ $line == Only\ in\ ${{ env.name }}:* ]]; then
             # Added file
-            FILE_PATH=$(echo "$line" | sed -E "s|Only in ${name}: ||")
-            URL="${base_url}/${FILE_PATH}"
-            ADDITIONS+="- [$FILE_PATH]($URL)"$'\n'
-          elif [[ $line == Only\ in\ latest:* ]]; then
+            PATH=$(echo "$line" | sed -E "s|Only in ${{ env.name }}: ||")
+            URL="${{env.base_url}}/${PATH}"
+            ADDITIONS+="- [$PATH]($URL)"$'\n'
+          elif [[ $line == Only\ in\ ${LATEST_DIR}:* ]]; then
             # Deleted file
-            FILE_PATH=$(echo "$line" | sed -E "s|Only in latest: ||")
-            DELETIONS+="- ~~${FILE_PATH}~~ (deleted)"$'\n'
+            PATH=$(echo "$line" | sed -E "s|Only in ${LATEST_DIR}: ||")
+            DELETIONS+="- ~${PATH}~ "$'\n'
           fi
         done <<< "$DIFF"
         
@@ -110,11 +109,14 @@ runs:
         [[ -n "$ADDITIONS" ]] && SUMMARY+="*New*\n$ADDITIONS\n"
         [[ -n "$CHANGES" ]] && SUMMARY+="*Modified*\n$CHANGES\n"
         [[ -n "$DELETIONS" ]] && SUMMARY+="*Deleted*\n$DELETIONS\n"
-        [[ -n "$SUMMARY" ]] && SUMMARY+="No content changes found in sites. Likely a change in design,js etc.\n"
+        [[ -n "$SUMMARY" ]] && SUMMARY="No content changes found in sites. Likely a change in design,js etc.\n"
         
-        echo "summary<<EOF" >> "$GITHUB_OUTPUT"
-        echo "$SUMMARY" >> "$GITHUB_OUTPUT"
-        echo "EOF" >> "$GITHUB_OUTPUT"
+        echo "summary<<EOF" >> $GITHUB_OUTPUT
+        echo $SUMMARY >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+      env:
+        LATEST_DIR: ${{ inputs.latest-directory }}
 
     - name: Comment Link to Preview
       if: inputs.enable-comment == 'true' && github.event.action != 'closed'
