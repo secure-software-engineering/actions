@@ -30,13 +30,11 @@ runs:
     - name: Install dependencies
       shell: bash
       run: |
-        curl -H "Authorization: Bearer $GH_TOKEN" \
-             -H "Accept: application/vnd.github.v3.raw" \
-             -L \
-             https://api.github.com/repos/secure-software-engineering/actions/contents/documentation/requirements.txt \
-        | pip install -r /dev/stdin
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        pip install mike                                                    # versioned MkDocs
+        pip install mkdocs-material                                         # theme
+        pip install mkdocs-tooltips                                         # tooltips
+        pip install mkdocs-include-markdown-plugin                          # includes (parts) of code files 
+        pip install git+https://github.com/swissiety/LspLexer4Pygments.git  # syntax highlighting
 
     - name: Configure git user
       shell: bash
