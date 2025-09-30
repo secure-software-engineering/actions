@@ -18,6 +18,14 @@ inputs:
     description: 'latest version to find the changed pages'
     required: false
     default: 'latest'
+  docs-dir:
+    description: 'same as in mkdocs.yml'
+    required: false
+    default: 'docs'
+  pip_dependencies:
+    description: 'install additional plugins for mkdocs'
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -47,11 +55,20 @@ runs:
     - name: Install dependencies
       shell: bash
       run: |
-        pip install mike                                                    # versioned MkDocs
-        pip install mkdocs-material                                         # theme
-        pip install mkdocs-tooltips                                         # tooltips
-        pip install mkdocs-include-markdown-plugin                          # includes (parts) of code files 
-        pip install git+https://github.com/swissiety/LspLexer4Pygments.git  # syntax highlighting
+        DEPS=(
+          mike                                # versioned MkDocs
+          mkdocs-material                     # theme
+          mkdocs-tooltips                     # tooltips
+          mkdocs-include-markdown-plugin      # include parts of code files
+          git+https://github.com/swissiety/LspLexer4Pygments.git  # syntax highlighting
+        )
+        pip install "${DEPS[@]}" ${ADDITIONAL_PIP_DEPENDENCIES}
+      env:
+        ADDITIONAL_PIP_DEPENDENCIES: ${{ inputs.pip_dependencies }}
+
+    - name: replace "{{ git_latest_release }}" with latest release tag version (without leading v) in all .md files under docs-dir
+      shell: bash
+      run: sed -i 's\{{ git_latest_release }}\'$(git tag --sort=committerdate | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+)?$' | tail -1 | sed 's/^v//')'\g' ${{ inputs.docs-dir }}/**.md
 
     - name: Configure git user
       shell: bash
