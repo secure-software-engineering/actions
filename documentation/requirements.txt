@@ -1,5 +1,0 @@
-mike                                                    # versioned mkdocs
-mkdocs-material                                         # theme
-mkdocs-tooltips                                         # tooltips
-mkdocs-include-markdown-plugin                          # include (parts) of other files
-git+https://github.com/swissiety/LspLexer4Pygments.git  # syntax highlighting via lsp server
