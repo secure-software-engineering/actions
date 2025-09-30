@@ -29,7 +29,14 @@ runs:
 
     - name: Install Dependencies
       shell: bash
-      run: pip install -r documentation/requirements.txt
+      # hint: keep synchronized with documentation/pr-preview
+      run: |
+        pip install \
+          mike \                                                    # versioned mkdocs
+          mkdocs-material \                                         # theme
+          mkdocs-tooltips \                                         # tooltips
+          mkdocs-include-markdown-plugin \                          # include (parts) of other files
+          git+https://github.com/swissiety/LspLexer4Pygments.git    # syntax highlighting via lsp server
 
     - name: Configure git user
       shell: bash
