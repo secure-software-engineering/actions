@@ -62,12 +62,24 @@ runs:
       shell: bash
       id: diff
       run: |
+        # sanity checks        
+        if [[ ! -d "latest" ]]; then
+          echo 'This seems to be the first version of the documentation - no documentation found for "latest".'
+          echo 'summary=""' >> $GITHUB_OUTPUT
+          exit 0;
+        elif [[ ! -d "${name}" ]]; then
+          echo 'No documentation found for preview "${{ env.name }}"'
+          echo 'summary=""' >> $GITHUB_OUTPUT
+          exit 0;
+        fi
+
         DIFF=$(diff -qr "latest" "${name}" | grep '\.html' || true)
         
         CHANGES=""
         ADDITIONS=""
         DELETIONS=""
         
+        # Sort files into categories
         while IFS= read -r line; do
           if [[ $line == Files* ]]; then
             # Modified file
