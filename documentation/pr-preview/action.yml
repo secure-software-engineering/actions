@@ -36,6 +36,7 @@ runs:
 
       env:
         REPO: ${{ github.event.repository.name }}
+        OWNER: ${{ github.repository_owner }}
 
     - name: Set up python
       uses: actions/setup-python@v5
@@ -54,7 +55,7 @@ runs:
 
     - name: Deploy the Preview
       shell: bash
-      run: mike deploy --branch ${{ inputs.gh-pages-branch }} --push --update-aliases -t "${{ env.title }}" ${{ env.name }}
+      run: mike deploy --branch ${{ inputs.pages-branch }} --push -t "${{ env.title }}" ${{ env.name }}
 
     - name: summarize changed files to create links to the updated pages
       if: inputs.enable-comment == 'true' && github.event.action != 'closed'
@@ -86,13 +87,13 @@ runs:
         done <<< "$DIFF"
         
         # Create summary
-        SUMMARY="""
+        SUMMARY=""
         [[ -n "$ADDITIONS" ]] && SUMMARY+="*New*\n$ADDITIONS\n"
         [[ -n "$CHANGES" ]] && SUMMARY+="*Modified*\n$CHANGES\n"
         [[ -n "$DELETIONS" ]] && SUMMARY+="*Deleted*\n$DELETIONS\n"
         [[ -n "$SUMMARY" ]] && SUMMARY+="No content changes found in sites. Likely a change in design,js etc.\n"
         
-        echo "links<<EOF" >> "$GITHUB_OUTPUT"
+        echo "summary<<EOF" >> "$GITHUB_OUTPUT"
         echo "$SUMMARY" >> "$GITHUB_OUTPUT"
         echo "EOF" >> "$GITHUB_OUTPUT"
 
@@ -103,10 +104,7 @@ runs:
         recreate: true
         message: |
           Documentation was updated: [Preview](${{ env.base-url}}/${{ env.name }}/)
-          ${{ steps.diff.outputs.links }}
-      env:
-        OWNER: ${{ github.repository_owner }}
-
+          ${{ steps.diff.outputs.summary }}
 
     - name: Delete the Preview
       if: github.event.action == 'closed'
