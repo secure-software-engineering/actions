@@ -2,28 +2,26 @@ name: Documentation Deployment
 description: Deploy documentation snapshots and releases to GitHub pages
 
 inputs:
-  name:
-    description: 'Name of the documentation'
+  version:
+    description: 'Version of the deployed artifact '
     required: true
-  title:
-    description: 'Title of the documentation'
-    required: true
-  gh-pages-branch:
+  pages-branch:
     description: 'The branch name where the gh pages are deployed to (default: gh-pages)'
     required: false
     default: 'gh-pages'
-  stable:
-    description: 'If true a stable version is deployed (default: false)'
-    required: false
-    default: 'false'
-  aliases:
-    description: 'List of aliases for the deployed version (default: latest'
-    required: false
-    default: 'latest'
 
 runs:
   using: composite
   steps:
+    - name: Configuration
+      shell: bash
+      run: |
+        echo 'base-url="https://$OWNER.github.io/$REPO/"'
+
+      env:
+        REPO: ${{ github.event.repository.name }}
+        OWNER: ${{ github.repository_owner }}
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -41,9 +39,4 @@ runs:
 
     - name: Deploy the Documentation
       shell: bash
-      run: mike deploy ${{ inputs.name }} ${{ inputs.aliases }} --branch ${{ inputs.gh-pages-branch }} --push --update-aliases -t "${{ inputs.title }}"
-
-    - name: Create stable Version
-      if: inputs.stable == 'true'
-      shell: bash
-      run: mike set-default ${{ inputs.name }} --push
+      run: mike deploy --branch ${{ inputs.pages-branch }} --push -t "${{ inputs.version }}" ${{ inputs.version }}
