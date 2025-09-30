@@ -47,14 +47,14 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      # hint: keep in sync with list in documentation/deployment
       run: |
-        pip install \
-        mike==1.1.2 \                                                    # versioned mkdocs
-        mkdocs-material==9.5.13 \                                        # theme
-        mkdocs-tooltips==0.4.0 \                                         # tooltips
-        mkdocs-include-markdown-plugin==4.0.4 \                          # include (parts) of other files
-        git+https://github.com/swissiety/LspLexer4Pygments.git           # syntax highlighting via lsp server
+        curl -H "Authorization: Bearer $GH_TOKEN" \
+             -H "Accept: application/vnd.github.v3.raw" \
+             -L \
+             https://api.github.com/repos/secure-software-engineering/actions/contents/documentation/requirements.txt \
+        | pip install -r /dev/stdin
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Configure git user
       shell: bash
