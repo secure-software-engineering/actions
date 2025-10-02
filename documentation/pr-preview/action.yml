@@ -90,7 +90,7 @@ runs:
           echo "summary=This seems to be the first version of the documentation - no documentation found for '${LATEST_DIR}'." >> $GITHUB_OUTPUT
           exit 0;
         elif [[ ! -d "${{ env.name }}" ]]; then
-          echo "summary="No documentation found for preview '${{ env.name }}'" >> $GITHUB_OUTPUT
+          echo "summary=No documentation found for preview '${{ env.name }}'" >> $GITHUB_OUTPUT
           exit 0;
         fi
 
