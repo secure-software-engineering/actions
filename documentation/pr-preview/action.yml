@@ -106,12 +106,12 @@ runs:
             # Modified file
             PATH=$(echo "$line" | sed -E "s|.* and ${{ env.name }}/(.*) differ|\1|")
             URL="${{ env.base_url }}/${PATH}"
-            CHANGES+="- [$PATH]($URL)\n"
+            CHANGES+="- [${PATH}](${URL})\n"
           elif [[ $line == Only\ in\ ${{ env.name }}:* ]]; then
             # Added file
             PATH=$(echo "$line" | sed -E "s|Only in ${{ env.name }}: ||")
             URL="${{ env.base_url }}/${PATH}"
-            ADDITIONS+="- [$PATH]($URL)\n"
+            ADDITIONS+="- [${PATH}](${URL})\n"
           elif [[ $line == Only\ in\ ${LATEST_DIR}:* ]]; then
             # Deleted file
             PATH=$(echo "$line" | sed -E "s|Only in ${LATEST_DIR}: ||")
@@ -123,9 +123,9 @@ runs:
      
         {
           echo "summary<<EOF"
-          [[ -n "$ADDITIONS" ]] && echo "*New*\n$ADDITIONS\n"
-          [[ -n "$CHANGES" ]]   && echo "*Modified*\n$CHANGES\n"
-          [[ -n "$DELETIONS" ]] && echo "*Deleted*\n$DELETIONS\n"
+          [[ -n "$ADDITIONS" ]] && echo -e "*New*\n$ADDITIONS\n"
+          [[ -n "$CHANGES" ]]   && echo -e "*Modified*\n$CHANGES\n"
+          [[ -n "$DELETIONS" ]] && echo -e "*Deleted*\n$DELETIONS\n"
           echo "EOF"
         } >> $GITHUB_OUTPUT
 
