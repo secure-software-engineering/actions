@@ -45,7 +45,7 @@ runs:
           mkdocs-include-markdown-plugin      # include parts of code files
           git+https://github.com/swissiety/LspLexer4Pygments.git  # syntax highlighting
         )
-        pip install "${DEPS[@]}" "${ADDITIONAL_PIP_DEPENDENCIES}"
+        pip install "${DEPS[@]}" ${ADDITIONAL_PIP_DEPENDENCIES}
       env:
         ADDITIONAL_PIP_DEPENDENCIES: ${{ inputs.pip_dependencies }}
 
