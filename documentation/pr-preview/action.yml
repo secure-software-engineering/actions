@@ -76,6 +76,11 @@ runs:
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
 
+    - name: Fetch gh-pages branch
+      shell: bash
+      run: |
+        git fetch origin gh-pages:${{ inputs.pages-branch }} || ( echo "gh-pages branch '${{ inputs.pages-branch }}' not found!"; exit 1 )
+
     - name: Deploy the Preview
       shell: bash
       run: mike deploy --branch ${{ inputs.pages-branch }} --push --update-aliases -t "${{ env.title }}" ${{ env.name }}
@@ -94,7 +99,13 @@ runs:
           exit 0;
         fi
 
-        DIFF=$(diff -qr "${LATEST_DIR}" "${{ env.name }}" | grep '\.html' || true)
+        DIFF=$(diff -qr "${LATEST_DIR}" "${{ env.name }}" | grep '\.html')
+        
+        // debug
+        echo "latestdir: ${LATEST_DIR}"
+        echo "envname: ${{ env.name }}"
+        echo $DIFF;
+        
         
         CHANGES=""
         ADDITIONS=""
@@ -102,6 +113,10 @@ runs:
         
         # Sort files into categories
         while IFS= read -r line; do
+          
+          // debug
+          echo $line
+          
           if [[ $line == Files* ]]; then
             # Modified file
             PATH=$(echo "$line" | sed -E "s|.* and ${{ env.name }}/(.*) differ|\1|")
@@ -119,15 +134,15 @@ runs:
           fi
         done <<< "$DIFF"
         
-        # Create summary
-     
+        # Create summary  
         {
           echo "summary<<EOF"
           [[ -n "$ADDITIONS" ]] && echo -e "*New*\n$ADDITIONS\n"
           [[ -n "$CHANGES" ]]   && echo -e "*Modified*\n$CHANGES\n"
           [[ -n "$DELETIONS" ]] && echo -e "*Deleted*\n$DELETIONS\n"
           echo "EOF"
-        } >> $GITHUB_OUTPUT
+        }
+# >> $GITHUB_OUTPUT
 
       env:
         LATEST_DIR: ${{ inputs.latest-directory }}
@@ -139,7 +154,8 @@ runs:
         recreate: true
         message: |
           Documentation was updated: [Preview](${{ env.base-url }}/${{ env.name }}/)
-          ${{ steps.diff.outputs.summary || 'No content changes found. Likely a change in design,js etc.\n' }}
+
+#          ${{ steps.diff.outputs.summary || 'No content changes found. Likely a change in design,js etc.\n' }}
 
     - name: Delete the Preview
       if: github.event.action == 'closed'

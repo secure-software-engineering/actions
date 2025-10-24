@@ -59,6 +59,11 @@ runs:
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
 
+    - name: Fetch gh-pages branch
+      shell: bash
+      run: |
+        git fetch origin gh-pages:${{ inputs.pages-branch }} || ( echo "gh-pages branch '${{ inputs.pages-branch }}' not found!"; exit 1 )
+
     - name: Deploy the Documentation
       shell: bash
       run: mike deploy --branch ${{ inputs.pages-branch }} --push --update-aliases -t "latest" ${{ inputs.version }}
