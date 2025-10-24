@@ -61,4 +61,8 @@ runs:
 
     - name: Deploy the Documentation
       shell: bash
-      run: mike deploy --branch ${{ inputs.pages-branch }} --push -t "${{ inputs.version }}" ${{ inputs.version }}
+      run: mike deploy --branch ${{ inputs.pages-branch }} --push --update-aliases -t "latest" ${{ inputs.version }}
+
+    - name: Set default documentation version
+      shell: bash
+      run: mike set-default latest
