@@ -8,14 +8,7 @@ inputs:
   token:
     description: 'GitHub token for authentication'
     required: true
-  java_version:
-    description: 'Java version to use'
-    required: false
-    default: '17'
-  java_distribution:
-    description: 'Java distribution to use'
-    required: false
-    default: 'temurin'
+
   latest_branch:
     description: 'Branch that contains the *latest* documentation enabling updates in that directory'
     required: false
@@ -24,15 +17,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Set up JDK
-      uses: actions/setup-java@v4
-      with:
-        java-version: ${{ inputs.java_version }}
-        distribution: ${{ inputs.java_distribution }}
 
     - name: Generate Javadoc
       shell: bash
@@ -41,7 +25,12 @@ runs:
     - name: sanitize input path
       shell: bash
       run: |
-          echo PATH=$("${{ inputs.path }}| sed "s/[^a-zA-Z0-9._-]/_/g") >> $GITHUB_ENV
+          PATH=$("${{ inputs.path }}| sed "s/[^a-zA-Z0-9._-]/_/g")
+          if [[ "$PATH" == "" ]]; then
+            echo "Error!"
+            exit 1
+          fi
+          echo "PATH=$PATH" >> $GITHUB_ENV
 
     - name: Publish Javadoc
       uses: peaceiris/actions-gh-pages@v4

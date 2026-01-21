@@ -35,10 +35,28 @@ inputs:
     description: 'Check whether the version to deploy is higher than the latest deployed version (default: false)'
     required: false
     default: 'false'
+  gh-release:
+    description: 'Adds a Tag and emits a Github Release'
+    required: false
+    default: 'true'
+  create-version-increment-pr:
+    description: 'creates a new Branch which adds -SNAPSHOT to the version and increments the patch version number'
+    required: false
+    default: 'true'
 
 runs:
   using: composite
   steps:
+    # for easier debugging / configuration
+    - name: Validate private key format
+      shell: bash
+      run: |
+        output=$(gpg --batch --import --dry-run <(echo "${{ inputs.gpg-private-key }}") 2>&1)
+        if [ $? -ne 0 ]; then
+          echo "Error importing GPG key: $output"
+          exit 1
+        fi
+
     - name: Set up Java and Credentials
       uses: actions/setup-java@v4
       with:
@@ -47,7 +65,7 @@ runs:
         server-id: ${{ inputs.server-id }}
         server-username: MAVEN_USERNAME                 # Env var that holds the central publisher user name
         server-password: MAVEN_CENTRAL_TOKEN            # Env var that holds the central publisher user token
-        gpg-private-key: ${{ inputs.gpg-private-key }} # Substituted with the value stored in the referenced secret
+        gpg-private-key: ${{ inputs.gpg-private-key }}  # Substituted with the value stored in the referenced secret
         gpg-passphrase: MAVEN_GPG_PASSPHRASE            # Env var that holds the key's passphrase
 
     # If we want to deploy a snapshot version, we have to make sure that the version ends with SNAPSHOT
@@ -94,6 +112,23 @@ runs:
           exit 1
         fi
 
+    - name: Check if gpg key is shared publicly
+      shell: bash
+      run: |
+        MAIL=gpg --with-colons --list-secret-keys | awk -F: '$1=="uid"{match($10, /<([^>]+)>/, m); if (m[1]) print m[1]}'
+        echo "pulisher adddress: $MAIL"
+        if [[ -z "$MAIL" ]]; then
+          echo "Error: Could not retrieve publisher email address from key." >&2
+          exit 2
+        fi
+
+        # Searching for publicly shared PGP key 
+        if ! gpg --batch --keyserver keys.openpgp.org --search-keys "$MAIL" >/dev/null 2>&1 ; then
+          echo "Error: No PGP key found for $MAIL" >&2
+          echo "Make sure the public key is published and email-verified on keys.openpgp.org" >&2
+          exit 1
+        fi
+
     - name: Run Maven Command
       shell: bash
       run: |
@@ -104,3 +139,33 @@ runs:
         MAVEN_USERNAME: ${{ inputs.server-username }}
         MAVEN_CENTRAL_TOKEN: ${{ inputs.server-password }}
         MAVEN_GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
+
+    - name: Create GitHub release
+      if: ${{ inputs.gh-release == 'true' }}
+      shell: bash
+      # create new gh-release with .jar and its signature
+      run: |
+        echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+        gh release create "${{ env.tag }}" \
+        --title "${{ env.tag }}" \
+        --generate-notes \
+        target/*.jar \
+        target/*.asc
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create branch+PR which updates to next SNAPSHOT version
+      if: ${{ inputs.create-version-increment-pr == 'true' }}
+      shell: bash
+      run: |
+        BRANCH_NAME="increment_version_${{ github.sha }}"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        git checkout -b ${BRANCH_NAME} master
+        mvn versions:set versions:commit -DnextSnapshot
+        git ls-files | grep 'pom.xml$' | xargs git add
+        git commit --allow-empty -am "Update version to next SNAPSHOT"
+        git push origin ${BRANCH_NAME}
+        gh pr create --draft -B develop -H ${BRANCH_NAME} -t "Update to next SNAPSHOT version" -b "Update to next SNAPSHOT version"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
