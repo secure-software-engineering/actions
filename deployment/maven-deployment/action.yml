@@ -35,6 +35,14 @@ inputs:
     description: 'Check whether the version to deploy is higher than the latest deployed version (default: false)'
     required: false
     default: 'false'
+  gh-release:
+    description: 'Adds a Tag and emits a Github Release'
+    required: false
+    default: 'true'
+  create-version-increment-pr:
+    description: 'creates a new Branch which adds -SNAPSHOT to the version and increments the patch version number'
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -121,3 +129,33 @@ runs:
         MAVEN_USERNAME: ${{ inputs.server-username }}
         MAVEN_CENTRAL_TOKEN: ${{ inputs.server-password }}
         MAVEN_GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
+
+    - name: Create GitHub release
+      if: ${{ inputs.gh-release == 'true' }}
+      shell: bash
+      # create new gh-release with .jar and its signature
+      run: |
+        echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+        gh release create "${{ env.tag }}" \
+        --title "${{ env.tag }}" \
+        --generate-notes \
+        target/*.jar \
+        target/*.asc
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create branch+PR which updates to next SNAPSHOT version
+      if: ${{ inputs.create-version-increment-pr == 'true' }}
+      shell: bash
+      run: |
+        BRANCH_NAME="increment_version_${{ github.sha }}"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        git checkout -b ${BRANCH_NAME} master
+        mvn versions:set versions:commit -DnextSnapshot
+        git ls-files | grep 'pom.xml$' | xargs git add
+        git commit --allow-empty -am "Update version to next SNAPSHOT"
+        git push origin ${BRANCH_NAME}
+        gh pr create --draft -B develop -H ${BRANCH_NAME} -t "Update to next SNAPSHOT version" -b "Update to next SNAPSHOT version"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
