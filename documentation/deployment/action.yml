@@ -62,7 +62,7 @@ runs:
     - name: Fetch gh-pages branch
       shell: bash
       run: |
-        git fetch origin "${{ inputs.pages-branch }}" --depth=1 || ( echo "gh-pages branch '${{ inputs.pages-branch }}' not found!"; exit 1 )
+        git fetch origin "${{ inputs.pages-branch }}" || ( echo "gh-pages branch '${{ inputs.pages-branch }}' not found!"; exit 1 )
 
     - name: Deploy the Documentation
       shell: bash
