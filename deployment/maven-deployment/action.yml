@@ -47,21 +47,6 @@ inputs:
 runs:
   using: composite
   steps:
-    # for easier debugging / configuration
-    - name: Validate private key format
-      shell: bash
-      run: |
-        if [ -z "${{ inputs.gpg-private-key }}" ]; then
-          echo 'input "gpg-private-key" key is empty!'
-          exit 1
-        fi
-
-        output=$(gpg --batch --import --dry-run <(echo "${{ inputs.gpg-private-key }}") 2>&1)
-        if [ $? -ne 0 ]; then
-          echo "Error importing GPG key: $output"
-          exit 1
-        fi
-
     - name: Set up Java and Credentials
       uses: actions/setup-java@v4
       with:
