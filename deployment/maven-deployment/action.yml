@@ -102,22 +102,30 @@ runs:
           exit 1
         fi
 
-    - name: Check if gpg key is shared publicly
+    - name: Check if gpg key is (already) shared publicly
       shell: bash
       run: |
-        MAIL=gpg --with-colons --list-secret-keys | awk -F: '$1=="uid"{match($10, /<([^>]+)>/, m); if (m[1]) print m[1]}'
-        echo "pulisher adddress: $MAIL"
-        if [[ -z "$MAIL" ]]; then
-          echo "Error: Could not retrieve publisher email address from key." >&2
-          exit 2
+        MAIL=$(gpg --with-colons --list-secret-keys | awk -F: '$1=="uid"{match($10, /<([^>]+)>/, m); if (m[1]) print m[1]}')
+        echo "publisher adddress: $MAIL"
+
+        # skip checks if more than one email address is found  
+        EMAIL_COUNT=$(echo "$MAIL" | wc -l)
+        if [[ "$EMAIL_COUNT" -eq 1 ]]; then
+          if [[ -z "$MAIL" ]]; then
+            echo "Error: Could not retrieve publisher email address from key." >&2
+            exit 2
+          fi
+  
+          # Searching for publicly shared PGP key 
+          if ! gpg --batch --keyserver keys.openpgp.org --search-keys "$MAIL" >/dev/null 2>&1 ; then
+            echo "Error: No PGP key found for $MAIL" >&2
+            echo "Make sure the public key is published and email-verified on keys.openpgp.org" >&2
+            exit 1
+          fi
+        else
+          echo "Found $EMAIL_COUNT email address(es) - expected exactly 1 to verify if the key is shared publicly."
         fi
 
-        # Searching for publicly shared PGP key 
-        if ! gpg --batch --keyserver keys.openpgp.org --search-keys "$MAIL" >/dev/null 2>&1 ; then
-          echo "Error: No PGP key found for $MAIL" >&2
-          echo "Make sure the public key is published and email-verified on keys.openpgp.org" >&2
-          exit 1
-        fi
 
     - name: Run Maven Command
       shell: bash
