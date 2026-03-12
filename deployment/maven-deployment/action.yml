@@ -51,9 +51,9 @@ runs:
     - name: Validate private key format
       shell: bash
       run: |
-        if[ -z "${{ inputs.gpg-private-key }}" ]; then
-          echo "input "gpg-private-key" key is empty!"
-          exit 1        
+        if [ -z "${{ inputs.gpg-private-key }}" ]; then
+          echo 'input "gpg-private-key" key is empty!'
+          exit 1
         fi
 
         output=$(gpg --batch --import --dry-run <(echo "${{ inputs.gpg-private-key }}") 2>&1)
