@@ -117,9 +117,10 @@ runs:
       shell: bash
       # create new gh-release with .jar and its signature
       run: |
-        echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-        gh release create "${{ env.tag }}" \
-        --title "${{ env.tag }}" \
+        tag=$(git describe --tags --abbrev=0)
+        echo "tag=$tag" >> "$GITHUB_ENV"
+        gh release create "$tag" \
+        --title "$tag" \
         --generate-notes \
         target/*.jar \
         target/*.asc
