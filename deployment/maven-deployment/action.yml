@@ -35,10 +35,6 @@ inputs:
     description: 'Check whether the version to deploy is higher than the latest deployed version (default: false)'
     required: false
     default: 'false'
-  gh-release:
-    description: 'Adds a Tag and emits a Github Release'
-    required: false
-    default: 'true'
   create-version-increment-pr:
     description: 'creates a new Branch which adds -SNAPSHOT to the version and increments the patch version number'
     required: false
@@ -113,11 +109,24 @@ runs:
         MAVEN_GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
 
     - name: Create GitHub release
-      if: ${{ inputs.gh-release == 'true' }}
+      if: ${{ inputs.deploy-mode == 'release' }}
       shell: bash
       # create new gh-release with .jar and its signature
       run: |
-        tag=$(git describe --tags --abbrev=0)
+        git fetch --tags --prune-tags
+        
+        VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        tag="v${VERSION}"
+        
+        # Check if this tag already exists
+        if git show-ref --tags --verify --quiet "refs/tags/${tag}"; then
+          tag=$(git describe --tags --abbrev=0)
+        else
+          echo "Creating new tag: $tag"
+          git tag -a "$tag" -m "Release $tag"
+          git push origin "$tag"
+        fi
+        
         echo "tag=$tag" >> "$GITHUB_ENV"
         gh release create "$tag" \
         --title "$tag" \
@@ -127,7 +136,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create branch+PR which updates to next SNAPSHOT version
+    - name: Create branch+PR to increase to the next (SNAPSHOT) version
       if: ${{ inputs.create-version-increment-pr == 'true' }}
       shell: bash
       run: |
