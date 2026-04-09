@@ -134,7 +134,7 @@ runs:
         target/*.jar \
         target/*.asc
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ input.GITHUB_TOKEN }}
 
     - name: Create branch+PR to increase to the next (SNAPSHOT) version
       if: ${{ inputs.deploy-mode == 'release' && inputs.create-version-increment-pr == 'true' }}
@@ -150,4 +150,4 @@ runs:
         git push origin ${BRANCH_NAME}
         gh pr create --draft -B develop -H ${BRANCH_NAME} -t "Update to next SNAPSHOT version" -b "Update to next SNAPSHOT version"
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ input.GITHUB_TOKEN }}
