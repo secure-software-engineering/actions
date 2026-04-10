@@ -63,6 +63,9 @@ runs:
       shell: bash
       run: |
         git fetch origin "${{ inputs.pages-branch }}" || ( echo "gh-pages branch '${{ inputs.pages-branch }}' not found!"; exit 1 )
+        # Advance local branch to the fetched remote tip so mike pushes on top of current remote state,
+        # not on a stale local base
+        git branch -f "${{ inputs.pages-branch }}" "origin/${{ inputs.pages-branch }}"
 
     - name: Deploy the Documentation
       shell: bash
