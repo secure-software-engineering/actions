@@ -1,33 +1,65 @@
-name: 'Zombie Release'
-description: 'Automatically create release PRs when dependency updates accumulate'
+name: 'Zombie Prepare Release'
+description: 'Create a release PR from base-branch to target-branch on a scheduled cadence'
+
+# Intended use: call this action N days before your release date (see README for cron examples).
+# If commits exist on base-branch not yet in target-branch, a versioned release PR is opened.
+# If a zombie-mode PR is already open, a reminder comment is added instead.
 
 inputs:
   token:
     description: 'GitHub token for authentication'
     required: true
   base-branch:
-    description: 'Base branch to create release PR against'
+    description: 'Branch with unreleased changes (PR source)'
+    required: false
+    default: 'develop'
+  target-branch:
+    description: 'Branch the release PR merges into'
     required: false
     default: 'main'
-  auto-merge-days:
-    description: 'Number of days before auto-merge (for PR description)'
+  version-bump:
+    description: |
+      Semver component to increment: patch | minor | major.
+      Wire an external compat-check action (see README) and pass its output here for automatic
+      semantic versioning. Defaults to patch when no compat-check is configured.
     required: false
-    default: '3'
+    default: 'patch'
+  auto-merge-days:
+    description: |
+      Days shown in the PR description as the auto-merge deadline.
+      Actual auto-merge is performed by the merge-pr action, not here.
+    required: false
+    default: ''
+  lead-days:
+    description: 'Informational: days before release date this action is expected to run (shown in PR body)'
+    required: false
+    default: '14'
   version-file:
-    description: 'Version file to update (pom.xml, package.json, etc.)'
+    description: 'Version file to update (currently only pom.xml is supported for automatic bumping)'
     required: false
     default: 'pom.xml'
+  java-version:
+    description: 'Java version for Maven version update (only used when version-file is pom.xml)'
+    required: false
+    default: '17'
+  java-distribution:
+    description: 'Java distribution for Maven version update'
+    required: false
+    default: 'temurin'
 
 outputs:
   release-created:
-    description: 'Whether a release PR was created'
-    value: ${{ steps.create-pr.outputs.release-created }}
+    description: 'true when a new release PR was opened, false when skipped'
+    value: ${{ steps.consolidate.outputs.release-created }}
   new-version:
-    description: 'The new version that was created'
-    value: ${{ steps.version.outputs.new_version }}
+    description: 'Version string of the created release (e.g. 1.3.0), empty when skipped'
+    value: ${{ steps.consolidate.outputs.new-version }}
   pr-number:
-    description: 'The PR number of the created release'
-    value: ${{ steps.create-pr.outputs.pr-number }}
+    description: 'Number of the created PR, empty when skipped'
+    value: ${{ steps.consolidate.outputs.pr-number }}
+  skipped-reason:
+    description: 'Human-readable reason when release-created=false (no-changes | existing-pr-N)'
+    value: ${{ steps.consolidate.outputs.skipped-reason }}
 
 runs:
   using: 'composite'
@@ -36,6 +68,7 @@ runs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        token: ${{ inputs.token }}
 
     - name: Configure git user
       shell: bash
@@ -43,143 +76,197 @@ runs:
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
 
-    - name: Get latest release
-      id: latest_release
+    # Setup Java/Maven only when we may need to update pom.xml
+    - name: Set up Java
+      if: inputs.version-file == 'pom.xml'
+      uses: actions/setup-java@v4
+      with:
+        distribution: ${{ inputs.java-distribution }}
+        java-package: jdk
+        java-version: ${{ inputs.java-version }}
+
+    # Compare branches via git; no external state needed
+    - name: Detect unreleased changes
+      id: detect_changes
       shell: bash
       run: |
-        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-        echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-        echo "Latest release: $LATEST_TAG"
+        git fetch origin "${{ inputs.target-branch }}" "${{ inputs.base-branch }}"
+        COMMIT_COUNT=$(git log "origin/${{ inputs.target-branch }}..origin/${{ inputs.base-branch }}" --oneline | wc -l)
+        echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+        echo "Commits on ${{ inputs.base-branch }} not in ${{ inputs.target-branch }}: $COMMIT_COUNT"
 
-    - name: Check for dependency updates since last release
-      id: check_updates
+    - name: Skip — no unreleased changes
+      if: steps.detect_changes.outputs.commit_count == '0'
       shell: bash
       run: |
-        if [[ "${{ steps.latest_release.outputs.latest_tag }}" == "v0.0.0" ]]; then
-          echo "No previous releases found, will create initial release"
-          echo "dependency_commits=1" >> $GITHUB_OUTPUT
-        else
-          echo "Checking commits since ${{ steps.latest_release.outputs.latest_tag }}"
-          DEPENDENCY_COMMITS=$(git log ${{ steps.latest_release.outputs.latest_tag }}..HEAD --oneline --grep="Bump\|dependabot" | wc -l)
-          echo "dependency_commits=$DEPENDENCY_COMMITS" >> $GITHUB_OUTPUT
-        fi
-        
-        echo "Dependency commits found: ${{ steps.check_updates.outputs.dependency_commits }}"
+        echo "No changes between ${{ inputs.base-branch }} and ${{ inputs.target-branch }}, nothing to release."
+        echo "ZOMBIE_RELEASE_CREATED=false"     >> $GITHUB_ENV
+        echo "ZOMBIE_SKIPPED_REASON=no-changes" >> $GITHUB_ENV
 
+    # Calculate next version from the highest semver tag.
+    # Using --sort=-version:refname instead of git describe so version-sort is correct (1.9 < 1.10)
+    # and we are not misled by tags on unrelated branches.
     - name: Calculate next version
-      if: steps.check_updates.outputs.dependency_commits > 0
+      if: steps.detect_changes.outputs.commit_count != '0'
       id: version
       shell: bash
       run: |
-        LATEST_TAG="${{ steps.latest_release.outputs.latest_tag }}"
-        if [[ $LATEST_TAG == "v0.0.0" ]]; then
-          NEW_VERSION="v1.0.0"
-        else
-          # Extract version numbers and increment minor
-          VERSION=${LATEST_TAG#v}
-          MAJOR=$(echo $VERSION | cut -d. -f1)
-          MINOR=$(echo $VERSION | cut -d. -f2)
-          NEW_MINOR=$((MINOR + 1))
-          NEW_VERSION="v${MAJOR}.${NEW_MINOR}.0"
-        fi
-        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-        echo "Next version: $NEW_VERSION"
+        LATEST_TAG=$(git tag --list 'v*.*.*' --sort=-version:refname | head -1)
+        LATEST_TAG=${LATEST_TAG:-v0.0.0}
+        echo "Latest tag: $LATEST_TAG"
 
-    - name: Check if release PR already exists
-      if: steps.check_updates.outputs.dependency_commits > 0
-      id: check_pr
+        VERSION=${LATEST_TAG#v}
+        MAJOR=$(echo "$VERSION" | cut -d. -f1)
+        MINOR=$(echo "$VERSION" | cut -d. -f2)
+        PATCH=$(echo "$VERSION" | cut -d. -f3)
+
+        case "${{ inputs.version-bump }}" in
+          major) NEW_VERSION="$((MAJOR + 1)).0.0" ;;
+          minor) NEW_VERSION="${MAJOR}.$((MINOR + 1)).0" ;;
+          *)     NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;  # patch (default)
+        esac
+
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "latest_tag=$LATEST_TAG"   >> $GITHUB_OUTPUT
+        echo "Next version: $NEW_VERSION (bump: ${{ inputs.version-bump }})"
+
+    # Search by label + target-branch only — not by exact head-branch name.
+    # This catches any open zombie PR regardless of version, preventing duplicate PRs
+    # when a previous run created a PR for an older version.
+    - name: Check for existing open zombie-mode PR
+      if: steps.detect_changes.outputs.commit_count != '0'
+      id: check_existing_pr
       shell: bash
       run: |
-        EXISTING_PR=$(gh pr list --base ${{ inputs.base-branch }} --head "zombie-release-${{ steps.version.outputs.new_version }}" --json number --jq '.[0].number // empty')
+        EXISTING_PR=$(gh pr list \
+          --base "${{ inputs.target-branch }}" \
+          --label "zombie-mode" \
+          --state open \
+          --json number \
+          --jq '.[0].number // empty')
+
         if [[ -n "$EXISTING_PR" ]]; then
-          echo "pr_exists=true" >> $GITHUB_OUTPUT
+          echo "pr_exists=true"            >> $GITHUB_OUTPUT
           echo "existing_pr_number=$EXISTING_PR" >> $GITHUB_OUTPUT
-          echo "Release PR already exists: #$EXISTING_PR"
+          echo "Existing zombie-mode PR found: #$EXISTING_PR"
         else
           echo "pr_exists=false" >> $GITHUB_OUTPUT
-          echo "No existing release PR found"
         fi
       env:
         GH_TOKEN: ${{ inputs.token }}
 
+    - name: Comment reminder on existing PR and skip
+      if: >
+        steps.detect_changes.outputs.commit_count != '0' &&
+        steps.check_existing_pr.outputs.pr_exists == 'true'
+      shell: bash
+      run: |
+        PR_NUMBER="${{ steps.check_existing_pr.outputs.existing_pr_number }}"
+        gh pr comment "$PR_NUMBER" \
+          --body "Reminder: this zombie-mode release PR is still open. Triggered by scheduled workflow on $(date -u '+%Y-%m-%d'). Please review and merge to proceed with the release."
+        echo "Commented on existing PR #$PR_NUMBER, skipping new PR creation."
+        echo "ZOMBIE_RELEASE_CREATED=false"                   >> $GITHUB_ENV
+        echo "ZOMBIE_SKIPPED_REASON=existing-pr-${PR_NUMBER}" >> $GITHUB_ENV
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+
+    # Branch from base-branch tip. Cleans up stale remote branch from a previous failed run.
     - name: Create release branch and update version
-      if: steps.check_updates.outputs.dependency_commits > 0 && steps.check_pr.outputs.pr_exists == 'false'
+      if: >
+        steps.detect_changes.outputs.commit_count != '0' &&
+        steps.check_existing_pr.outputs.pr_exists == 'false'
       shell: bash
       run: |
         NEW_VERSION="${{ steps.version.outputs.new_version }}"
-        BRANCH_NAME="zombie-release-$NEW_VERSION"
-        
-        # Check if branch exists remotely and delete it
+        BRANCH_NAME="zombie-release-v${NEW_VERSION}"
+
+        # Remove stale remote branch if present from a previous interrupted run
         if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
-          echo "Remote branch $BRANCH_NAME exists, deleting it..."
-          git push origin --delete "$BRANCH_NAME" || echo "Failed to delete remote branch, continuing..."
+          echo "Removing stale remote branch $BRANCH_NAME..."
+          git push origin --delete "$BRANCH_NAME" || echo "Could not delete stale remote branch, continuing"
         fi
-        
-        # Delete local branch if it exists
-        if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
-          echo "Local branch $BRANCH_NAME exists, deleting it..."
-          git branch -D "$BRANCH_NAME"
-        fi
-        
-        # Create release branch
-        git checkout -b "$BRANCH_NAME"
-        
-        # Update version in specified file if it exists
-        if [ -f "${{ inputs.version-file }}" ]; then
-          if [[ "${{ inputs.version-file }}" == "pom.xml" ]]; then
-            MAVEN_VERSION=${NEW_VERSION#v}  # Remove 'v' prefix for Maven
-            if command -v mvn &> /dev/null; then
-              mvn versions:set -DnewVersion=$MAVEN_VERSION -DgenerateBackupPoms=false || echo "Maven version update failed, continuing..."
-            else
-              echo "Maven not available, skipping version update"
-            fi
-          fi
-        
-          if [ -f "${{ inputs.version-file }}" ]; then
-            git add ${{ inputs.version-file }}
-            git commit -m "Update version to ${NEW_VERSION#v}" || echo "No changes to commit"
+
+        git checkout -b "$BRANCH_NAME" "origin/${{ inputs.base-branch }}"
+
+        # Update pom.xml using Maven; pattern mirrors version/action.yml for multi-module support
+        if [[ "${{ inputs.version-file }}" == "pom.xml" ]] && [ -f "pom.xml" ]; then
+          if command -v mvn &>/dev/null; then
+            mvn versions:set -DnewVersion="${NEW_VERSION}" -DgenerateBackupPoms=false
+            git ls-files | grep 'pom.xml$' | xargs git add
+            git commit --allow-empty -m "Bump version to ${NEW_VERSION}"
+          else
+            echo "Maven not on PATH, skipping pom.xml version update"
           fi
         fi
-        
-        # Push the branch
-        git push origin "zombie-release-$NEW_VERSION"
+
+        git push origin "$BRANCH_NAME"
+        echo "RELEASE_BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
     - name: Create release PR
-      if: steps.check_updates.outputs.dependency_commits > 0 && steps.check_pr.outputs.pr_exists == 'false'
-      id: create-pr
+      if: >
+        steps.detect_changes.outputs.commit_count != '0' &&
+        steps.check_existing_pr.outputs.pr_exists == 'false'
+      id: create_pr
       shell: bash
       run: |
         NEW_VERSION="${{ steps.version.outputs.new_version }}"
-        LATEST_TAG="${{ steps.latest_release.outputs.latest_tag }}"
-        
-        # Generate changelog of dependency updates
-        CHANGES=$(git log $LATEST_TAG..HEAD --oneline --grep="Bump\|dependabot" --pretty=format:"- %s" | head -20)
-        
-        # Calculate auto-merge date
-        AUTO_MERGE_DATE=$(date -d '+${{ inputs.auto-merge-days }} days' '+%Y-%m-%d %H:%M UTC')
-        
-        # Create PR body
-        PR_BODY="Zombie Release: $NEW_VERSION - Dependencies updated since $LATEST_TAG - Auto-merge: $AUTO_MERGE_DATE"
-        
-        # Create the PR
+        LATEST_TAG="${{ steps.version.outputs.latest_tag }}"
+        BRANCH_NAME="zombie-release-v${NEW_VERSION}"
+
+        # All commits on base-branch not yet in target-branch
+        CHANGES=$(git log "origin/${{ inputs.target-branch }}..origin/${{ inputs.base-branch }}" \
+          --pretty=format:"- %s" | head -30)
+
+        # Auto-merge note in PR body (informational; actual merge handled by merge-pr action)
+        if [[ -n "${{ inputs.auto-merge-days }}" ]]; then
+          # GNU date required (ubuntu-latest provides this)
+          MERGE_DATE=$(date -u -d "+${{ inputs.auto-merge-days }} days" '+%Y-%m-%d')
+          AUTO_MERGE_NOTE="Auto-merge scheduled: ${MERGE_DATE} (+${{ inputs.auto-merge-days }} days)"
+        else
+          AUTO_MERGE_NOTE="Auto-merge: disabled — manual merge required"
+        fi
+
+        # Write PR body to temp file to avoid quoting issues with multiline content
+        PR_BODY_FILE=$(mktemp)
+        cat > "$PR_BODY_FILE" << PREOF
+## Zombie Release: v${NEW_VERSION}
+
+Changes on \`${{ inputs.base-branch }}\` since ${LATEST_TAG}:
+
+${CHANGES}
+
+---
+${AUTO_MERGE_NOTE}
+Lead time: ${{ inputs.lead-days }} days
+Version bump: ${{ inputs.version-bump }}
+PREOF
+
         PR_NUMBER=$(gh pr create \
-          --title "Zombie Release: $NEW_VERSION" \
-          --body "$PR_BODY" \
-          --base ${{ inputs.base-branch }} \
-          --head "zombie-release-$NEW_VERSION" \
+          --title "Zombie Release: v${NEW_VERSION}" \
+          --body-file "$PR_BODY_FILE" \
+          --base "${{ inputs.target-branch }}" \
+          --head "$BRANCH_NAME" \
           --label "zombie-mode,dependencies,auto-merge" \
           --json number \
           --jq '.number')
-        
-        echo "release-created=true" >> $GITHUB_OUTPUT
-        echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
-        echo "Created release PR #$PR_NUMBER for $NEW_VERSION"
+
+        rm "$PR_BODY_FILE"
+
+        echo "Created release PR #$PR_NUMBER for v${NEW_VERSION}"
+        echo "ZOMBIE_RELEASE_CREATED=true"         >> $GITHUB_ENV
+        echo "ZOMBIE_RELEASE_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+        echo "ZOMBIE_RELEASE_PR=$PR_NUMBER"         >> $GITHUB_ENV
       env:
         GH_TOKEN: ${{ inputs.token }}
 
-    - name: No Release Needed
-      if: steps.check_updates.outputs.dependency_commits == 0
+    # Single output source — reads GITHUB_ENV vars set by whichever branch ran above.
+    # Runs unconditionally so outputs are always populated.
+    - name: Consolidate outputs
+      id: consolidate
+      if: always()
       shell: bash
       run: |
-        echo "No dependency updates found, no release needed"
-        echo "release-created=false" >> $GITHUB_OUTPUT
+        echo "release-created=${ZOMBIE_RELEASE_CREATED:-false}" >> $GITHUB_OUTPUT
+        echo "new-version=${ZOMBIE_RELEASE_VERSION:-}"          >> $GITHUB_OUTPUT
+        echo "pr-number=${ZOMBIE_RELEASE_PR:-}"                 >> $GITHUB_OUTPUT
+        echo "skipped-reason=${ZOMBIE_SKIPPED_REASON:-}"        >> $GITHUB_OUTPUT
