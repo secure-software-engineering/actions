@@ -90,7 +90,11 @@ runs:
       shell: bash
       id: diff
       run: |
-        # sanity checks        
+        PREVIEW_DIR=$(mktemp -d)
+        git archive ${{ inputs.pages-branch }} | tar -x -C "${PREVIEW_DIR}"
+        cd "${PREVIEW_DIR}"
+
+        # sanity checks
         if [[ ! -d "${LATEST_DIR}" ]]; then
           echo "summary=This seems to be the first version of the documentation - no documentation found for '${LATEST_DIR}'." >> $GITHUB_OUTPUT
           exit 0;
@@ -100,62 +104,58 @@ runs:
         fi
 
         DIFF=$(diff -qr "${LATEST_DIR}" "${{ env.name }}" | grep '\.html')
-        
-        // debug
-        echo "latestdir: ${LATEST_DIR}"
-        echo "envname: ${{ env.name }}"
-        echo $DIFF;
-        
-        
+
         CHANGES=""
         ADDITIONS=""
         DELETIONS=""
-        
+
         # Sort files into categories
         while IFS= read -r line; do
-          
-          // debug
-          echo $line
-          
           if [[ $line == Files* ]]; then
             # Modified file
-            PATH=$(echo "$line" | sed -E "s|.* and ${{ env.name }}/(.*) differ|\1|")
-            URL="${{ env.base_url }}/${PATH}"
-            CHANGES+="- [${PATH}](${URL})\n"
-          elif [[ $line == Only\ in\ ${{ env.name }}:* ]]; then
+            FILE_PATH=$(echo "$line" | sed -E "s|.* and ${{ env.name }}/(.*) differ|\1|")
+            URL="${{ env.base-url }}/${{ env.name }}/${FILE_PATH}"
+            CHANGES+="- [${FILE_PATH}](${URL})\n"
+          elif [[ $line == Only\ in\ ${{ env.name }}* ]]; then
             # Added file
-            PATH=$(echo "$line" | sed -E "s|Only in ${{ env.name }}: ||")
-            URL="${{ env.base_url }}/${PATH}"
-            ADDITIONS+="- [${PATH}](${URL})\n"
-          elif [[ $line == Only\ in\ ${LATEST_DIR}:* ]]; then
+            SUBDIR=$(echo "$line" | sed -E "s|Only in ${{ env.name }}/?([^:]*): .*|\1|")
+            FILE=$(echo "$line" | sed -E "s|.*: ||")
+            FILE_PATH="${SUBDIR:+${SUBDIR}/}${FILE}"
+            URL="${{ env.base-url }}/${{ env.name }}/${FILE_PATH}"
+            ADDITIONS+="- [${FILE_PATH}](${URL})\n"
+          elif [[ $line == Only\ in\ ${LATEST_DIR}* ]]; then
             # Deleted file
-            PATH=$(echo "$line" | sed -E "s|Only in ${LATEST_DIR}: ||")
-            DELETIONS+="- ~${PATH}~ \n"
+            SUBDIR=$(echo "$line" | sed -E "s|Only in ${LATEST_DIR}/?([^:]*): .*|\1|")
+            FILE=$(echo "$line" | sed -E "s|.*: ||")
+            FILE_PATH="${SUBDIR:+${SUBDIR}/}${FILE}"
+            DELETIONS+="- ~${FILE_PATH}~ \n"
           fi
         done <<< "$DIFF"
-        
-        # Create summary  
-        {
-          echo "summary<<EOF"
-          [[ -n "$ADDITIONS" ]] && echo -e "*New*\n$ADDITIONS\n"
-          [[ -n "$CHANGES" ]]   && echo -e "*Modified*\n$CHANGES\n"
-          [[ -n "$DELETIONS" ]] && echo -e "*Deleted*\n$DELETIONS\n"
-          echo "EOF"
-        }
-# >> $GITHUB_OUTPUT
+
+        # Create summary
+        if [[ -n "$ADDITIONS" || -n "$CHANGES" || -n "$DELETIONS" ]]; then
+          {
+            echo "summary<<EOF"
+            [[ -n "$ADDITIONS" ]] && echo -e "*New*\n$ADDITIONS\n"
+            [[ -n "$CHANGES" ]]   && echo -e "*Modified*\n$CHANGES\n"
+            [[ -n "$DELETIONS" ]] && echo -e "*Deleted*\n$DELETIONS\n"
+            echo "EOF"
+            echo "has-changes=true"
+          } >> $GITHUB_OUTPUT
+        fi
 
       env:
         LATEST_DIR: ${{ inputs.latest-directory }}
 
     - name: Comment Link to Preview
-      if: inputs.enable-comment == 'true' && github.event.action != 'closed'
+      if: inputs.enable-comment == 'true' && github.event.action != 'closed' && steps.diff.outputs.has-changes == 'true'
       uses: marocchino/sticky-pull-request-comment@v2
       with:
         recreate: true
         message: |
           Documentation was updated: [Preview](${{ env.base-url }}/${{ env.name }}/)
 
-#          ${{ steps.diff.outputs.summary || 'No content changes found. Likely a change in design,js etc.\n' }}
+          ${{ steps.diff.outputs.summary }}
 
     - name: Delete the Preview
       if: github.event.action == 'closed'
