@@ -103,7 +103,7 @@ runs:
           exit 0;
         fi
 
-        DIFF=$(diff -qr "${LATEST_DIR}" "${{ env.name }}" | grep '\.html')
+        DIFF=$(diff -qr "${LATEST_DIR}" "${{ env.name }}" | grep '\.html' || true)
 
         CHANGES=""
         ADDITIONS=""
