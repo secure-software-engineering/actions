@@ -103,14 +103,25 @@ runs:
           exit 0;
         fi
 
-        DIFF=$(diff -qr "${LATEST_DIR}" "${{ env.name }}" | grep '\.html' || true)
+        DIFF_ALL=$(diff -qr "${LATEST_DIR}" "${{ env.name }}" | grep '\.html' || true)
+        DIFF_API=$(echo "$DIFF_ALL" | grep '/api/' || true)
+        DIFF=$(echo "$DIFF_ALL" | grep -v '/api/' || true)
 
         CHANGES=""
         ADDITIONS=""
         DELETIONS=""
+        COUNT=0
+        TRUNCATED=false
+        MAX_FILES=10
 
         # Sort files into categories
         while IFS= read -r line; do
+          [[ -z "$line" ]] && continue
+          ((COUNT++, 1))
+          if [[ $COUNT -gt $MAX_FILES ]]; then
+            TRUNCATED=true
+            continue
+          fi
           if [[ $line == Files* ]]; then
             # Modified file
             FILE_PATH=$(echo "$line" | sed -E "s|.* and ${{ env.name }}/(.*) differ|\1|")
@@ -133,12 +144,14 @@ runs:
         done <<< "$DIFF"
 
         # Create summary
-        if [[ -n "$ADDITIONS" || -n "$CHANGES" || -n "$DELETIONS" ]]; then
+        if [[ -n "$ADDITIONS" || -n "$CHANGES" || -n "$DELETIONS" || -n "$DIFF_API" ]]; then
           {
             echo "summary<<EOF"
             [[ -n "$ADDITIONS" ]] && echo -e "*New*\n$ADDITIONS\n"
             [[ -n "$CHANGES" ]]   && echo -e "*Modified*\n$CHANGES\n"
             [[ -n "$DELETIONS" ]] && echo -e "*Deleted*\n$DELETIONS\n"
+            [[ "$TRUNCATED" == "true" ]] && echo -e "_... and $((COUNT - MAX_FILES)) more files not shown_\n"
+            [[ -n "$DIFF_API" ]] && echo -e "_Javadoc was updated_\n"
             echo "EOF"
             echo "has-changes=true"
           } >> $GITHUB_OUTPUT
