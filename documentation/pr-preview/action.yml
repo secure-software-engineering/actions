@@ -60,6 +60,7 @@ runs:
           mkdocs-material                     # theme
           mkdocs-tooltips                     # tooltips
           mkdocs-include-markdown-plugin      # include parts of code files
+          mkdocs-git-revision-date-localized  # last-modified dates on pages
           git+https://github.com/swissiety/LspLexer4Pygments.git  # syntax highlighting
         )
         pip install "${DEPS[@]}" ${ADDITIONAL_PIP_DEPENDENCIES}
