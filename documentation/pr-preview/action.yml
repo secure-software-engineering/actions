@@ -86,6 +86,27 @@ runs:
       shell: bash
       run: mike deploy --branch ${{ inputs.pages-branch }} --push --update-aliases -t "${{ env.title }}" ${{ env.name }}
 
+    - name: Ensure root redirect and latest alias (in case of first deployment in that repo)
+      shell: bash
+      run: |
+        git fetch origin ${{ inputs.pages-branch }}
+        git branch -f ${{ inputs.pages-branch }} origin/${{ inputs.pages-branch }}
+        NEEDS_PUSH=false
+
+        # If no version is aliased as "latest" yet, point "latest" to this preview
+        if ! mike list --branch ${{ inputs.pages-branch }} 2>/dev/null | grep -q "\[latest\]"; then
+          mike alias --branch ${{ inputs.pages-branch }} ${{ env.name }} latest
+          NEEDS_PUSH=true
+        fi
+
+        # If root has no index.html yet, set default to "latest"
+        if ! git show ${{ inputs.pages-branch }}:index.html > /dev/null 2>&1; then
+          mike set-default --branch ${{ inputs.pages-branch }} latest
+          NEEDS_PUSH=true
+        fi
+
+        [ "$NEEDS_PUSH" = "true" ] && git push origin ${{ inputs.pages-branch }}
+
     - name: summarize changed files to create links to the updated pages
       if: inputs.enable-comment == 'true' && github.event.action != 'closed'
       shell: bash

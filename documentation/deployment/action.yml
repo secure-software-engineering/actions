@@ -74,4 +74,4 @@ runs:
 
     - name: Set default documentation version
       shell: bash
-      run: mike set-default latest
+      run: mike set-default --branch ${{ inputs.pages-branch }} --push latest
