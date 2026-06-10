@@ -14,7 +14,7 @@ inputs:
     required: false
     default: 'docs'
   pip_dependencies:
-    description: 'install additional plugins for mkdocs'
+    description: 'Space-separated list of additional pip packages to install'
     required: false
     default: ''
 
@@ -33,7 +33,7 @@ runs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: '3.11'
 
     - name: Install dependencies
       shell: bash
