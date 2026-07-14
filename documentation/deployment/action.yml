@@ -30,6 +30,16 @@ runs:
         REPO: ${{ github.event.repository.name }}
         OWNER: ${{ github.repository_owner }}
 
+    - name: Ensure full git history
+      shell: bash
+      run: |
+        # git-revision-date-localized-plugin needs full history to date each file correctly.
+        # On a shallow checkout it can't find a file's real last-modifying commit and
+        # falls back to the tip commit's date for every page.
+        if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+          git fetch --prune --unshallow
+        fi
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
