@@ -40,7 +40,7 @@ on:
 
 jobs:
   prepare-release:
-    uses: secure-software-engineering/actions/.github/workflows/action.yml@develop
+    uses: secure-software-engineering/actions/.github/workflows/maven-release-prepare.yml@develop
     with:
       release_type: ${{ inputs.release_type }}
     secrets:
@@ -61,7 +61,7 @@ on:
 
 jobs:
   sync:
-    uses: secure-software-engineering/actions/.github/workflows/action.yml@develop
+    uses: secure-software-engineering/actions/.github/workflows/maven-release-title-sync.yml@develop
     secrets:
       release_pat: ${{ secrets.AUTO_MERGE_PAT }}
 ```
@@ -83,7 +83,7 @@ on:
 
 jobs:
   publish:
-    uses: secure-software-engineering/actions/.github/workflows/action.yml@develop
+    uses: secure-software-engineering/actions/.github/workflows/maven-release-publish.yml@develop
     secrets:
       release_pat: ${{ secrets.AUTO_MERGE_PAT }}
       gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
