@@ -27,6 +27,9 @@ zombie-mode/ - Fully automated dependency management for unmaintained repositori
 #### Version Management
 version/ - Automated version updates and releases for Maven projects
 
+#### Release Management (Maven)
+release/ - Reusable workflows (prepare / title-sync / publish) for the full tag + Maven Central deploy + next-SNAPSHOT release lifecycle
+
 #### Usage
 Reference actions using:
 ```yaml
