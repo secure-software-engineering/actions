@@ -20,7 +20,7 @@ The calling repository must define these and pass them through explicitly (or vi
 | Maven Central username| publish                                 | Publisher authentication                                            |
 | Maven Central token   | publish                                 | Publisher authentication                                            |
 
-## 1. `maven-release-prepare.yml`
+## 1. `maven-release-prepare/action.yml`
 
 Opens a release PR against `head_branch` (default `develop`) with the version bumped from the
 latest `vX.Y.Z` tag according to `release_type`.
@@ -40,14 +40,14 @@ on:
 
 jobs:
   prepare-release:
-    uses: secure-software-engineering/actions/.github/workflows/maven-release-prepare.yml@develop
+    uses: secure-software-engineering/actions/.github/workflows/action.yml@develop
     with:
       release_type: ${{ inputs.release_type }}
     secrets:
       release_pat: ${{ secrets.AUTO_MERGE_PAT }}
 ```
 
-## 2. `maven-release-title-sync.yml`
+## 2. `maven-release-title-sync/action.yml`
 
 Keeps the version on the release branch in sync whenever the PR title's `[major]`/`[minor]`/`[patch]`
 tag is edited. Only acts on branches named `release/prep-*` opened by the prepare workflow above.
@@ -61,12 +61,12 @@ on:
 
 jobs:
   sync:
-    uses: secure-software-engineering/actions/.github/workflows/maven-release-title-sync.yml@develop
+    uses: secure-software-engineering/actions/.github/workflows/action.yml@develop
     secrets:
       release_pat: ${{ secrets.AUTO_MERGE_PAT }}
 ```
 
-## 3. `maven-release-publish.yml`
+## 3. `maven-release-publish/action.yml`
 
 Triggered by the release PR closing (cleanup if abandoned) and by pushes to `head_branch` (tag,
 deploy to Maven Central, open the auto-merging "next SNAPSHOT" PR).
@@ -83,7 +83,7 @@ on:
 
 jobs:
   publish:
-    uses: secure-software-engineering/actions/.github/workflows/maven-release-publish.yml@develop
+    uses: secure-software-engineering/actions/.github/workflows/action.yml@develop
     secrets:
       release_pat: ${{ secrets.AUTO_MERGE_PAT }}
       gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
