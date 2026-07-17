@@ -1,8 +1,8 @@
 # Actions for Maven Release Management
 
 Reusable **workflows** (not composite actions) that orchestrate the full release lifecycle for a
-Maven-based project: open a release PR, keep it in sync with its title, and on merge tag +
-deploy to Maven Central + advance the base branch to the next SNAPSHOT.
+Maven-based project: open a release PR (on demand or on a schedule), keep it in sync with its
+title, and on merge tag + deploy to Maven Central + advance the base branch to the next SNAPSHOT.
 
 Because each of these needs multiple jobs, `needs:`-chained outputs and (for the deploy job) an
 `environment:` protection rule, they are implemented as [reusable workflows](https://docs.github.com/en/actions/using-workflows/reusing-workflows)
@@ -14,7 +14,7 @@ The calling repository must define these and pass them through explicitly (or vi
 
 | Secret               | Used by                                | Purpose                                                            |
 |-----------------------|-----------------------------------------|---------------------------------------------------------------------|
-| a PAT (any name)      | prepare, title-sync, publish            | Push branches / open+merge PRs. Default `GITHUB_TOKEN` is usually blocked by branch protection or can't trigger downstream workflows. |
+| a PAT (any name)      | prepare, title-sync, publish, schedule   | Push branches / open+merge PRs. Default `GITHUB_TOKEN` is usually blocked by branch protection or can't trigger downstream workflows. |
 | GPG private key       | publish                                 | Sign deployed artifacts                                             |
 | GPG passphrase        | publish                                 | Unlock the GPG private key                                          |
 | Maven Central username| publish                                 | Publisher authentication                                            |
@@ -94,6 +94,28 @@ jobs:
 
 `publish` needs the `deployment` GitHub environment (or whatever you pass as `deployment_environment`)
 to exist in the calling repo if you want required-reviewer protection on the Maven Central deploy step.
+
+## 4. `maven-release-schedule/action.yml`
+
+Runs on a cron. Opens a `patch` release PR (via `maven-release-prepare` above) once there are
+unreleased commits on `head_branch` and the oldest one has aged past `release_ready_age_days`,
+skipping if a bot-authored `release/prep-*` PR is already open. Separately, auto-merges any open
+`release/prep-*` PR once it's aged past `stale_pr_age_days`, provided it isn't a draft and has no
+real merge conflicts.
+
+```yaml
+name: Release Schedule
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+
+jobs:
+  schedule:
+    uses: secure-software-engineering/actions/.github/workflows/maven-release-schedule.yml@develop
+    secrets:
+      release_pat: ${{ secrets.AUTO_MERGE_PAT }}
+```
 
 See each workflow's `on.workflow_call.inputs`/`secrets` block for the full list of overridable
 knobs (Java version/distribution, Maven server id, extra deploy args, branch names, etc).
