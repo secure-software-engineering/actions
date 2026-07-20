@@ -1,0 +1,106 @@
+name: Resolve latest version matching pattern
+description: Finds the highest existing git tag matching a {major}/{minor}/{patch} pattern and extracts its version parts
+
+inputs:
+  pattern:
+    description: 'Pattern used to form tags, using {major}/{minor}/{patch} placeholders (e.g. "v{major}.{minor}.{patch}")'
+    required: true
+
+outputs:
+  found:
+    description: 'Whether any existing tag matched the pattern ("true"/"false")'
+    value: ${{ steps.resolve.outputs.found }}
+  tag:
+    description: 'The matching tag with the highest version (empty if found=false)'
+    value: ${{ steps.resolve.outputs.tag }}
+  major:
+    description: 'Major version number of the highest matching tag (empty if found=false)'
+    value: ${{ steps.resolve.outputs.major }}
+  minor:
+    description: 'Minor version number of the highest matching tag (empty if found=false)'
+    value: ${{ steps.resolve.outputs.minor }}
+  patch:
+    description: 'Patch version number of the highest matching tag (empty if found=false)'
+    value: ${{ steps.resolve.outputs.patch }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve latest version matching pattern
+      id: resolve
+      shell: bash
+      env:
+        PATTERN: ${{ inputs.pattern }}
+      run: |
+        set -euo pipefail
+
+        # Build a git-tag glob by replacing placeholders with '*'. This is a
+        # coarse pre-filter only - the regex below does the exact match, so
+        # over-matching here is fine, it just can't under-match.
+        GLOB="$PATTERN"
+        GLOB="${GLOB//\{major\}/*}"
+        GLOB="${GLOB//\{minor\}/*}"
+        GLOB="${GLOB//\{patch\}/*}"
+
+        # Determine placeholder order of appearance, needed to map regex
+        # capture groups back to major/minor/patch below.
+        ORDER=()
+        REMAINING="$PATTERN"
+        while [[ "$REMAINING" =~ \{(major|minor|patch)\} ]]; do
+          ORDER+=("${BASH_REMATCH[1]}")
+          REMAINING="${REMAINING/${BASH_REMATCH[0]}/}"
+        done
+
+        # Build an ERE from the pattern: mask placeholders behind markers that
+        # can't collide with regex metacharacters, escape the remaining
+        # literal text, then swap the markers for numbered capture groups.
+        MARKED="$PATTERN"
+        MARKED="${MARKED//\{major\}/@@MAJOR@@}"
+        MARKED="${MARKED//\{minor\}/@@MINOR@@}"
+        MARKED="${MARKED//\{patch\}/@@PATCH@@}"
+        ESCAPED=$(printf '%s' "$MARKED" | sed -E 's/[+*?.()|^$\{}]/\\&/g')
+        REGEX="$ESCAPED"
+        REGEX="${REGEX//@@MAJOR@@/([0-9]+)}"
+        REGEX="${REGEX//@@MINOR@@/([0-9]+)}"
+        REGEX="${REGEX//@@PATCH@@/([0-9]+)}"
+        REGEX="^${REGEX}\$"
+
+        # Sort candidates as a numeric (major, minor, patch) tuple rather
+        # than lexically/`sort -V` on the raw tag - that breaks as soon as
+        # the pattern isn't a plain dotted string (e.g. release_4_9_0 vs
+        # release_4_10_0), and it also naturally drops tags that don't match
+        # the pattern at all (e.g. legacy or unrelated tags in the repo).
+        BEST_LINE=$(
+          while IFS= read -r TAG; do
+            [[ -z "$TAG" ]] && continue
+            if [[ "$TAG" =~ $REGEX ]]; then
+              MAJOR=0; MINOR=0; PATCH=0
+              for i in "${!ORDER[@]}"; do
+                GROUP_NUM=$((i + 1))
+                case "${ORDER[$i]}" in
+                  major) MAJOR="${BASH_REMATCH[$GROUP_NUM]}" ;;
+                  minor) MINOR="${BASH_REMATCH[$GROUP_NUM]}" ;;
+                  patch) PATCH="${BASH_REMATCH[$GROUP_NUM]}" ;;
+                esac
+              done
+              printf '%d.%d.%d %s\n' "$MAJOR" "$MINOR" "$PATCH" "$TAG"
+            fi
+          done < <(git tag --list "$GLOB") | sort -t. -k1,1n -k2,2n -k3,3n | tail -1
+        )
+
+        if [[ -z "$BEST_LINE" ]]; then
+          echo "found=false" >> "$GITHUB_OUTPUT"
+          echo "tag=" >> "$GITHUB_OUTPUT"
+          echo "major=" >> "$GITHUB_OUTPUT"
+          echo "minor=" >> "$GITHUB_OUTPUT"
+          echo "patch=" >> "$GITHUB_OUTPUT"
+        else
+          VERSION_PART="${BEST_LINE%% *}"
+          TAG_PART="${BEST_LINE#* }"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_PART"
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG_PART" >> "$GITHUB_OUTPUT"
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+          echo "minor=$MINOR" >> "$GITHUB_OUTPUT"
+          echo "patch=$PATCH" >> "$GITHUB_OUTPUT"
+        fi

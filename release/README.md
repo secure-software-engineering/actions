@@ -20,6 +20,16 @@ The calling repository must define these and pass them through explicitly (or vi
 | Maven Central username| publish                                 | Publisher authentication                                            |
 | Maven Central token   | publish                                 | Publisher authentication                                            |
 
+## Tag / release naming
+
+All four workflows accept a `tag_pattern` input controlling how git tags and GitHub release names
+are formed from the version, using `{major}`/`{minor}`/`{patch}` placeholders. It defaults to
+`'v{major}.{minor}.{patch}'` (e.g. `v1.2.3`), matching the previous hardcoded behavior. Pass
+`tag_pattern: '{major}.{minor}.{patch}'` for unprefixed tags (e.g. `1.2.3`), or any other literal
+text around the placeholders (e.g. `'release_{major}_{minor}_{patch}'`). `maven-release-schedule`
+passes its own `tag_pattern` through to the `maven-release-prepare` call it makes internally, so
+you only need to set it once per repo, on whichever of these workflows you call directly.
+
 ## 1. `maven-release-prepare/action.yml`
 
 Opens a release PR against `head_branch` (default `develop`) with the version bumped from the

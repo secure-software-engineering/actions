@@ -13,6 +13,11 @@ on:
         required: false
         type: string
         default: 'zulu'
+      tag_pattern:
+        description: 'Pattern used to form git tags/release names from the version, using {major}/{minor}/{patch} placeholders (e.g. "v{major}.{minor}.{patch}" -> v1.2.3). Use "{major}.{minor}.{patch}" for unprefixed tags.'
+        required: false
+        type: string
+        default: 'v{major}.{minor}.{patch}'
     secrets:
       release_pat:
         description: 'PAT used to check out and push the amended release branch. The default GITHUB_TOKEN is typically blocked by branch protection.'
@@ -73,26 +78,28 @@ jobs:
             exit 1
           fi
 
+      - name: Fetch tags
+        run: git fetch --tags
+
+      - name: Resolve latest version matching tag_pattern
+        id: latest
+        uses: secure-software-engineering/actions/release/lib/resolve-latest-version@develop
+        with:
+          pattern: ${{ inputs.tag_pattern }}
+
       - name: Recompute release version from latest tag
         id: version
         env:
           RELEASE_TYPE: ${{ steps.parsed.outputs.release_type }}
+          FOUND: ${{ steps.latest.outputs.found }}
+          MAJOR: ${{ steps.latest.outputs.major }}
+          MINOR: ${{ steps.latest.outputs.minor }}
+          PATCH: ${{ steps.latest.outputs.patch }}
         run: |
           set -euo pipefail
-          git fetch --tags
-          LATEST_VERSION=$(git tag --list 'v*' | sed 's/^v//' | sort -V | tail -1)
 
-          if [[ -z "$LATEST_VERSION" ]]; then
-            echo "No existing vX.Y.Z tag found in repo" >&2
-            exit 1
-          fi
-
-          if [[ "$LATEST_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            MAJOR="${BASH_REMATCH[1]}"
-            MINOR="${BASH_REMATCH[2]}"
-            PATCH="${BASH_REMATCH[3]}"
-          else
-            echo "Could not parse latest tag version '$LATEST_VERSION' as semver" >&2
+          if [[ "$FOUND" != "true" ]]; then
+            echo "No existing tag matching pattern '${{ inputs.tag_pattern }}' found in repo" >&2
             exit 1
           fi
 

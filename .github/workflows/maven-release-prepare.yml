@@ -22,6 +22,11 @@ on:
         required: false
         type: string
         default: 'zulu'
+      tag_pattern:
+        description: 'Pattern used to form git tags/release names from the version, using {major}/{minor}/{patch} placeholders (e.g. "v{major}.{minor}.{patch}" -> v1.2.3). Use "{major}.{minor}.{patch}" for unprefixed tags.'
+        required: false
+        type: string
+        default: 'v{major}.{minor}.{patch}'
     secrets:
       release_pat:
         description: 'PAT used to check out, push the release branch and open the PR. The default GITHUB_TOKEN is typically blocked by branch protection or cannot trigger downstream workflows.'
@@ -55,25 +60,28 @@ jobs:
           java-version: ${{ inputs.java_version }}
           cache: 'maven'
 
+      - name: Resolve latest version matching tag_pattern
+        id: latest
+        uses: secure-software-engineering/actions/release/lib/resolve-latest-version@develop
+        with:
+          pattern: ${{ inputs.tag_pattern }}
+
       - name: Determine initial release version from latest tag
         id: version
+        env:
+          FOUND: ${{ steps.latest.outputs.found }}
+          MAJOR: ${{ steps.latest.outputs.major }}
+          MINOR: ${{ steps.latest.outputs.minor }}
+          PATCH: ${{ steps.latest.outputs.patch }}
         run: |
           set -euo pipefail
-          LATEST_VERSION=$(git tag --list 'v*' | sed 's/^v//' | sort -V | tail -1)
 
-          if [[ -z "$LATEST_VERSION" ]]; then
-            echo "No existing vX.Y.Z tag found in repo" >&2
+          if [[ "$FOUND" != "true" ]]; then
+            echo "No existing tag matching pattern '${{ inputs.tag_pattern }}' found in repo" >&2
             exit 1
           fi
 
-          if [[ "$LATEST_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            MAJOR="${BASH_REMATCH[1]}"
-            MINOR="${BASH_REMATCH[2]}"
-            PATCH="${BASH_REMATCH[3]}"
-          else
-            echo "Could not parse latest tag version '$LATEST_VERSION' as semver" >&2
-            exit 1
-          fi
+          LATEST_VERSION="$MAJOR.$MINOR.$PATCH"
 
           case "${{ inputs.release_type }}" in
             major) RELEASE_VERSION="$((MAJOR + 1)).0.0" ;;
@@ -87,6 +95,11 @@ jobs:
 
           echo "Latest released version: $LATEST_VERSION -> proposed $RELEASE_VERSION (${{ inputs.release_type }})"
           echo "release_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+
+          IFS='.' read -r REL_MAJOR REL_MINOR REL_PATCH <<< "$RELEASE_VERSION"
+          echo "major=$REL_MAJOR" >> "$GITHUB_OUTPUT"
+          echo "minor=$REL_MINOR" >> "$GITHUB_OUTPUT"
+          echo "patch=$REL_PATCH" >> "$GITHUB_OUTPUT"
 
       - name: Create release branch and bump version
         id: branch
@@ -109,6 +122,15 @@ jobs:
 
           echo "release_branch=$RELEASE_BRANCH" >> "$GITHUB_OUTPUT"
 
+      - name: Format the proposed release tag (for the PR body only)
+        id: tag
+        uses: secure-software-engineering/actions/release/lib/format-version-tag@develop
+        with:
+          pattern: ${{ inputs.tag_pattern }}
+          major: ${{ steps.version.outputs.major }}
+          minor: ${{ steps.version.outputs.minor }}
+          patch: ${{ steps.version.outputs.patch }}
+
       - name: Open PR against ${{ inputs.head_branch }}
         env:
           GH_TOKEN: ${{ secrets.release_pat }}
@@ -121,4 +143,4 @@ jobs:
 
           To change the release type, edit the title's \`[${{ inputs.release_type }}]\` tag to \`[major]\`, \`[minor]\` or \`[patch]\` - the version and this branch update automatically.
 
-          **This PR must be merged manually.** Merging it tags \`v${{ steps.version.outputs.release_version }}\` (adjusted if you edited the type tag), deploys to Maven Central, and opens a follow-up PR advancing \`${{ inputs.head_branch }}\` to the next SNAPSHOT (that one auto-merges)."
+          **This PR must be merged manually.** Merging it tags \`${{ steps.tag.outputs.tag }}\` (adjusted if you edited the type tag), deploys to Maven Central, and opens a follow-up PR advancing \`${{ inputs.head_branch }}\` to the next SNAPSHOT (that one auto-merges)."

@@ -38,6 +38,11 @@ on:
         required: false
         type: string
         default: 'deployment'
+      tag_pattern:
+        description: 'Pattern used to form git tags/release names from the version, using {major}/{minor}/{patch} placeholders (e.g. "v{major}.{minor}.{patch}" -> v1.2.3). Use "{major}.{minor}.{patch}" for unprefixed tags.'
+        required: false
+        type: string
+        default: 'v{major}.{minor}.{patch}'
     secrets:
       release_pat:
         description: 'PAT used to check out, push and open/merge PRs. The default GITHUB_TOKEN is typically blocked by branch protection or cannot trigger downstream workflows.'
@@ -110,17 +115,46 @@ jobs:
           gpg-private-key: ${{ secrets.gpg_private_key }}  # Substituted with the value stored in the referenced secret
           gpg-passphrase: MAVEN_GPG_PASSPHRASE             # Env var that holds the key's passphrase
 
-      - name: Determine version and check for existing tag
-        id: version
+      - name: Determine current Maven version
+        id: mvn_version
         run: |
           set -euo pipefail
           # ${{ inputs.head_branch }}'s tip now holds whatever version the merged release PR brought in
           CURRENT_VERSION=$(mvn -ntp org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version -DforceStdout 2>/dev/null | grep -v '^\[' | tail -1)
-          TAG_NAME="v$CURRENT_VERSION"
+          echo "version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+          if [[ "$CURRENT_VERSION" == *-SNAPSHOT ]]; then
+            echo "is_snapshot=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_snapshot=false" >> "$GITHUB_OUTPUT"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+            echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+            echo "minor=$MINOR" >> "$GITHUB_OUTPUT"
+            echo "patch=$PATCH" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Format the release tag
+        id: tag
+        if: steps.mvn_version.outputs.is_snapshot == 'false'
+        uses: secure-software-engineering/actions/release/lib/format-version-tag@develop
+        with:
+          pattern: ${{ inputs.tag_pattern }}
+          major: ${{ steps.mvn_version.outputs.major }}
+          minor: ${{ steps.mvn_version.outputs.minor }}
+          patch: ${{ steps.mvn_version.outputs.patch }}
+
+      - name: Determine version and check for existing tag
+        id: version
+        env:
+          CURRENT_VERSION: ${{ steps.mvn_version.outputs.version }}
+          IS_SNAPSHOT: ${{ steps.mvn_version.outputs.is_snapshot }}
+          TAG_NAME: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
           echo "version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
           echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
 
-          if [[ "$CURRENT_VERSION" == *-SNAPSHOT ]]; then
+          if [[ "$IS_SNAPSHOT" == "true" ]]; then
             echo "is_release=false" >> "$GITHUB_OUTPUT"
             echo "::notice::${{ inputs.head_branch }} is still on a SNAPSHOT version ($CURRENT_VERSION) after a release/prep merge; skipping release."
           elif git ls-remote --exit-code --tags origin "refs/tags/$TAG_NAME" >/dev/null 2>&1; then

@@ -33,6 +33,11 @@ on:
         required: false
         type: string
         default: '7'
+      tag_pattern:
+        description: 'Pattern used to form git tags/release names from the version, using {major}/{minor}/{patch} placeholders (e.g. "v{major}.{minor}.{patch}" -> v1.2.3). Use "{major}.{minor}.{patch}" for unprefixed tags.'
+        required: false
+        type: string
+        default: 'v{major}.{minor}.{patch}'
     secrets:
       release_pat:
         description: 'PAT used to check out, query/merge PRs and open the release PR. The default GITHUB_TOKEN is typically blocked by branch protection or cannot trigger downstream workflows.'
@@ -57,15 +62,21 @@ jobs:
           ref: ${{ inputs.head_branch }}
           fetch-depth: 0
 
+      - name: Resolve latest version matching tag_pattern
+        id: latest
+        uses: secure-software-engineering/actions/release/lib/resolve-latest-version@develop
+        with:
+          pattern: ${{ inputs.tag_pattern }}
+
       - name: Check for unreleased changes and open release PR
         id: check
         env:
           GH_TOKEN: ${{ secrets.release_pat }}
           HEAD_BRANCH: ${{ inputs.head_branch }}
           RELEASE_READY_AGE_DAYS: ${{ inputs.release_ready_age_days }}
+          latest_tag: ${{ steps.latest.outputs.tag }}
         run: |
           set -euo pipefail
-          latest_tag=$(git tag -l | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
           if [ -z "$latest_tag" ]; then
             echo "No release tag found, skipping automated safety check." >&2
             echo "should_release=true" >> "$GITHUB_OUTPUT"
@@ -112,6 +123,7 @@ jobs:
       head_branch: ${{ inputs.head_branch }}
       java_version: ${{ inputs.java_version }}
       java_distribution: ${{ inputs.java_distribution }}
+      tag_pattern: ${{ inputs.tag_pattern }}
     secrets:
       release_pat: ${{ secrets.release_pat }}
 

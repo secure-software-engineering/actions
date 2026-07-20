@@ -1,0 +1,40 @@
+name: Format version tag
+description: Turns a major/minor/patch version into a concrete tag/release name using a {major}/{minor}/{patch} pattern
+
+inputs:
+  pattern:
+    description: 'Pattern to format, using {major}/{minor}/{patch} placeholders (e.g. "v{major}.{minor}.{patch}")'
+    required: true
+  major:
+    description: 'Major version number'
+    required: true
+  minor:
+    description: 'Minor version number'
+    required: true
+  patch:
+    description: 'Patch version number'
+    required: true
+
+outputs:
+  tag:
+    description: 'The formatted tag/release name'
+    value: ${{ steps.format.outputs.tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Format tag from pattern
+      id: format
+      shell: bash
+      env:
+        PATTERN: ${{ inputs.pattern }}
+        MAJOR: ${{ inputs.major }}
+        MINOR: ${{ inputs.minor }}
+        PATCH: ${{ inputs.patch }}
+      run: |
+        set -euo pipefail
+        TAG="$PATTERN"
+        TAG="${TAG//\{major\}/$MAJOR}"
+        TAG="${TAG//\{minor\}/$MINOR}"
+        TAG="${TAG//\{patch\}/$PATCH}"
+        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
