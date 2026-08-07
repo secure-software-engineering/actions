@@ -92,6 +92,22 @@ runs:
       run: |
         git fetch origin gh-pages:${{ inputs.pages-branch }} || ( echo "gh-pages branch '${{ inputs.pages-branch }}' not found!"; exit 1 )
 
+    - name: Snapshot previous preview (for diffing against last comment)
+      if: inputs.enable-comment == 'true' && github.event.action != 'closed'
+      shell: bash
+      id: snapshot
+      run: |
+        # capture the pre-deploy state of this PR's preview, if it exists, so the
+        # next diff step can show only what changed since the last comment
+        if git cat-file -e ${{ inputs.pages-branch }}:${{ env.name }} 2>/dev/null; then
+          PREV_DIR=$(mktemp -d)
+          git archive ${{ inputs.pages-branch }} -- ${{ env.name }} | tar -x -C "${PREV_DIR}"
+          echo "has-previous=true" >> $GITHUB_OUTPUT
+          echo "dir=${PREV_DIR}" >> $GITHUB_OUTPUT
+        else
+          echo "has-previous=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Deploy the Preview
       shell: bash
       run: mike deploy --branch ${{ inputs.pages-branch }} --push --update-aliases -t "${{ env.title }}" --prop-set hidden=true ${{ env.name }}
@@ -129,13 +145,25 @@ runs:
         cd "${PREVIEW_DIR}"
 
         # sanity checks
-        if [[ ! -d "${LATEST_DIR}" ]]; then
-          echo "summary=This seems to be the first version of the documentation - no documentation found for '${LATEST_DIR}'." >> $GITHUB_OUTPUT
-          exit 0;
-        elif [[ ! -d "${{ env.name }}" ]]; then
+        if [[ ! -d "${{ env.name }}" ]]; then
           echo "summary=No documentation found for preview '${{ env.name }}'" >> $GITHUB_OUTPUT
           exit 0;
         fi
+
+        if [[ "${{ steps.snapshot.outputs.has-previous }}" == "true" ]]; then
+          # a previous preview (and likely a previous comment) exists - diff against
+          # that instead of the released docs, so only changes since last comment show
+          rm -rf "${LATEST_DIR}"
+          cp -r "${{ steps.snapshot.outputs.dir }}/${{ env.name }}" "${LATEST_DIR}"
+        elif [[ ! -d "${LATEST_DIR}" ]]; then
+          echo "summary=This seems to be the first version of the documentation - no documentation found for '${LATEST_DIR}'." >> $GITHUB_OUTPUT
+          exit 0;
+        fi
+
+        # strip the revision-date/author footer so a page that only got a fresh
+        # "last updated" stamp isn't reported as changed
+        find "${LATEST_DIR}" "${{ env.name }}" -name '*.html' -print0 | \
+          xargs -0 perl -0777 -pi -e 's{<span class="git-revision-date-localized-plugin[^"]*".*?</span>}{}gs'
 
         DIFF_ALL=$(diff -qr "${LATEST_DIR}" "${{ env.name }}" | grep '\.html' || true)
         DIFF_API=$(echo "$DIFF_ALL" | grep '/api/' || true)
