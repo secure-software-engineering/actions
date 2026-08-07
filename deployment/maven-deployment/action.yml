@@ -91,8 +91,23 @@ runs:
               -o "$TMP_POM"
         LATEST_VERSION=$(mvn -f "$TMP_POM" help:evaluate -Dexpression=project.version -q -DforceStdout)
         rm "$TMP_POM"
-        
-        if [ "$(printf "%s\n%s" "$PROPOSED_NEW_VERSION" "$LATEST_VERSION" | sort -V | head -n1)" = "$PROPOSED_NEW_VERSION" ]; then
+
+        # Strip -SNAPSHOT for the numeric comparison: sort -V treats "-SNAPSHOT" as
+        # a higher string than no suffix, which is backwards from Maven precedence
+        # (1.0.0-SNAPSHOT < 1.0.0). Releasing X.Y.Z off an X.Y.Z-SNAPSHOT base branch
+        # must be allowed.
+        PROPOSED_BASE="${PROPOSED_NEW_VERSION%-SNAPSHOT}"
+        LATEST_BASE="${LATEST_VERSION%-SNAPSHOT}"
+
+        if [ "$PROPOSED_BASE" = "$LATEST_BASE" ]; then
+          # Same numeric version: only reject if proposed is still a SNAPSHOT
+          # while latest is not
+          if [[ "$PROPOSED_NEW_VERSION" == *-SNAPSHOT && "$LATEST_VERSION" != *-SNAPSHOT ]]; then
+            echo "Proposed new version is lower than the latest version!"
+            echo "$PROPOSED_NEW_VERSION <= $LATEST_VERSION"
+            exit 1
+          fi
+        elif [ "$(printf "%s\n%s" "$PROPOSED_BASE" "$LATEST_BASE" | sort -V | head -n1)" = "$PROPOSED_BASE" ]; then
           echo "Proposed new version is lower than the latest version!"
           echo "$PROPOSED_NEW_VERSION <= $LATEST_VERSION"
           exit 1
