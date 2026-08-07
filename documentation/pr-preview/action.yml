@@ -94,7 +94,7 @@ runs:
 
     - name: Deploy the Preview
       shell: bash
-      run: mike deploy --branch ${{ inputs.pages-branch }} --push --update-aliases -t "${{ env.title }}" ${{ env.name }}
+      run: mike deploy --branch ${{ inputs.pages-branch }} --push --update-aliases -t "${{ env.title }}" --prop-set hidden=true ${{ env.name }}
 
     - name: Ensure root redirect and latest alias (in case of first deployment in that repo)
       shell: bash
