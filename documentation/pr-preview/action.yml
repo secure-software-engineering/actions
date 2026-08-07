@@ -115,7 +115,9 @@ runs:
           NEEDS_PUSH=true
         fi
 
-        [ "$NEEDS_PUSH" = "true" ] && git push origin ${{ inputs.pages-branch }}
+        if [ "$NEEDS_PUSH" = "true" ]; then
+          git push origin ${{ inputs.pages-branch }}
+        fi
 
     - name: summarize changed files to create links to the updated pages
       if: inputs.enable-comment == 'true' && github.event.action != 'closed'
