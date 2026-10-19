@@ -103,7 +103,7 @@ jobs:
 
           bot_login=$(gh api user --jq '.login')
           open_release_prs=$(gh pr list --base "$HEAD_BRANCH" --state open --json number,author,headRefName \
-            --jq --arg bot "$bot_login" \
+            | jq --arg bot "$bot_login" \
               '[.[] | select(.author.login == $bot and (.headRefName | startswith("release/prep-")))] | length')
           if [ "$open_release_prs" -gt 0 ]; then
             echo "A release PR opened by $bot_login is already open against ${HEAD_BRANCH}, skipping."
@@ -148,7 +148,7 @@ jobs:
 
           release_prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --base "$HEAD_BRANCH" --state open \
             --json number,title,createdAt,author,isDraft,headRefName \
-            --jq --arg bot "$bot_login" \
+            | jq --arg bot "$bot_login" \
               '[.[] | select(.author.login == $bot and .isDraft == false
                 and (.headRefName | startswith("release/prep-")))]')
 
