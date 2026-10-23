@@ -93,7 +93,9 @@ jobs:
           # Oldest unreleased commit must itself be past the age threshold -
           # this debounces the release so it doesn't fire on every small
           # change, only once something has been sitting unreleased a while.
-          oldest_epoch=$(git log --reverse --format=%ct "${latest_tag}..origin/${HEAD_BRANCH}" | head -1)
+          # tail (not head) reads all input - head would close the pipe early,
+          # git gets SIGPIPE and pipefail turns that into exit 141.
+          oldest_epoch=$(git log --format=%ct "${latest_tag}..origin/${HEAD_BRANCH}" | tail -1)
           age_days=$(( ( $(date -u +%s) - oldest_epoch ) / 86400 ))
           if [ "$age_days" -lt "$RELEASE_READY_AGE_DAYS" ]; then
             echo "Oldest unreleased commit is only $age_days day(s) old, not yet ${RELEASE_READY_AGE_DAYS}. Skipping."
