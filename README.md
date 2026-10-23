@@ -16,7 +16,6 @@ GitHub Pages: Enable for documentation deployment
 
 ### Dependency Management
 dependabot/ - automatically merge and approve successful Dependabot PRs
-zombie-mode/ - Fully automated dependency management for unmaintained repositories
 
 #### Documentation
 
@@ -35,13 +34,6 @@ Reference actions using:
 ```yaml
 uses: secure-software-engineering/actions/{action-path}@develop
 ```
-
-## Zombie Mode
-For repositories requiring zero-maintenance:
-
-Auto-approves and merges Dependabot PRs
-Creates weekly release PRs with accumulated changes
-Auto-merges after 3-day review window
 
 See individual action READMEs for detailed configuration.
 

@@ -6,7 +6,7 @@ version: 2
 updates:
   - package-ecosystem: "github-actions"
     # "/" scans .github/workflows plus every composite action.yml in the repo
-    # (javadoc/, deployment/, documentation/, zombie-mode/, version/, dependabot/)
+    # (javadoc/, deployment/, documentation/, version/, dependabot/)
     directory: "/"
     schedule:
       interval: "weekly"
