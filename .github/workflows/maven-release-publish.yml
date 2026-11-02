@@ -223,6 +223,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # GITHUB_TOKEN approves the bump PR below. The PR is authored by the
+      # release_pat owner, who cannot approve their own PR.
+      pull-requests: write
     steps:
       - name: Checkout ${{ inputs.head_branch }}
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -239,6 +242,7 @@ jobs:
           cache: 'maven'
 
       - name: Bump to next SNAPSHOT and open auto-merge PR
+        id: bump
         env:
           GH_TOKEN: ${{ secrets.release_pat }}
           ACTOR: ${{ github.actor }}
@@ -284,3 +288,20 @@ jobs:
           # actual merge, so branch cleanup must be left to the repo's "Automatically
           # delete head branches" setting instead.
           gh pr merge "$PR_NUMBER" --auto --merge
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Approve next-SNAPSHOT PR as github-actions[bot]
+        # The PR is opened with release_pat, so its owner is the PR author and
+        # GitHub won't let them approve it - branch protection requiring a review
+        # would block the auto-merge forever. Approving with GITHUB_TOKEN counts as
+        # a review by a different actor (github-actions[bot]).
+        # Requires the repo/org setting "Allow GitHub Actions to create and approve
+        # pull requests" (Settings -> Actions -> General -> Workflow permissions).
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.bump.outputs.pr_number }}
+          RELEASE_TAG_NAME: ${{ needs.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          gh pr review "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --approve \
+            -b "Automated SNAPSHOT bump following ${RELEASE_TAG_NAME}."

@@ -93,6 +93,9 @@ on:
 
 jobs:
   publish:
+    permissions:
+      contents: write        # tag + GitHub release
+      pull-requests: write   # GITHUB_TOKEN approves the next-SNAPSHOT PR
     uses: secure-software-engineering/actions/.github/workflows/maven-release-publish.yml@develop
     secrets:
       release_pat: ${{ secrets.AUTO_MERGE_PAT }}
@@ -104,6 +107,12 @@ jobs:
 
 `publish` needs the `deployment` GitHub environment (or whatever you pass as `deployment_environment`)
 to exist in the calling repo if you want required-reviewer protection on the Maven Central deploy step.
+
+The next-SNAPSHOT PR is opened with the PAT, so the PAT owner is its author and can't approve it.
+`publish` therefore approves it with `GITHUB_TOKEN` (as `github-actions[bot]`) so auto-merge can go
+through under a "require approving review" branch protection. This needs **Settings -> Actions ->
+General -> "Allow GitHub Actions to create and approve pull requests"** enabled (org-level too, if
+the org restricts it), and `pull-requests: write` granted by the caller as shown above.
 
 ## 4. `maven-release-schedule/action.yml`
 
