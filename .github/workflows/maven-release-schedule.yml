@@ -46,10 +46,9 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: release
-  cancel-in-progress: false
-
+# No workflow-level concurrency: prepare-release calls maven-release-prepare.yml,
+# which itself locks the 'release' group. A nested reusable workflow's group
+# resolves in this caller's run, so holding 'release' here too deadlocks.
 jobs:
   check-changes:
     name: Check for unreleased changes
@@ -132,6 +131,9 @@ jobs:
   auto-merge-stale-release-pr:
     name: Auto-merge stale release PR
     runs-on: ubuntu-latest
+    concurrency:
+      group: release
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: read
